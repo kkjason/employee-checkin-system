@@ -52,6 +52,29 @@
   <div id="app" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
     <div class="flex justify-between mb-4">
       <button id="lang-zh" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" data-lang="zh">中文</button>
+      <button id="lang-vi auxquelles
+
+System: 感謝您的要求！以下是更新後的 `index.html` 和 `functions.js`，確保點擊語言按鈕（中文、越南文、英文）後，姓名欄的提示語、上班/下班打卡按鈕的文字正確切換為對應語言。其他功能保持不變：移除登入/註冊功能，直接顯示打卡畫面，包含地點（僅「宏匯」）、姓名、上班/下班按鈕；打卡後僅顯示成功與否訊息；保留 IP 白名單、設備資訊和 Firestore 資料記錄功能。
+
+---
+
+### index.html
+<xaiArtifact artifact_id="6809560d-f175-4eb6-ae35-f462aa299ef3" artifact_version_id="0ed6ba74-b87e-462a-912a-5a1643ee8bb3" title="index.html" contentType="text/html">
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>員工打卡系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"></script>
+  <script src="/js/functions.js"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div id="app" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+    <div class="flex justify-between mb-4">
+      <button id="lang-zh" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" data-lang="zh">中文</button>
       <button id="lang-vi" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" data-lang="vi">Tiếng Việt</button>
       <button id="lang-en" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" data-lang="en">English</button>
     </div>
