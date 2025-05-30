@@ -1,4 +1,4 @@
-import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { collection, getDocs, addDoc, doc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 export async function getUserIPs() {
   const ipList = [];
@@ -230,7 +230,12 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
     statusElement.classList.remove('text-red-600', 'text-blue-600', 'hidden');
     statusElement.classList.add('text-green-600');
   } catch (error) {
-    statusElement.textContent = `${translations[lang].fail} ${error.message}`;
+    console.error('打卡失敗:', error);
+    if (error.code === 'permission-denied') {
+      statusElement.textContent = `${translations[lang].fail} 權限不足，請聯繫管理員檢查 Firestore 設置`;
+    } else {
+      statusElement.textContent = `${translations[lang].fail} ${error.message}`;
+    }
     statusElement.classList.remove('text-green-600', 'text-blue-600', 'hidden');
     statusElement.classList.add('text-red-600');
   }
