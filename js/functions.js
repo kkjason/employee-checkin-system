@@ -1,5 +1,5 @@
 const db = firebase.firestore();
-const ipWhitelist = ['192.168.1.1', '203.0.113.0']; // 替換為您的 IP 白名單
+const ipWhitelist = ['192.168.1.1', '203.0.113.0']; // 請替換為實際的 IP 白名單
 
 async function getUserIP() {
   try {
@@ -14,36 +14,56 @@ async function getUserIP() {
 
 function getDeviceInfo() {
   const ua = navigator.userAgent;
-  let device = '未知設備';
+  let device = 'Unknown Device';
   if (/iPhone|iPad|iPod/i.test(ua)) {
-    device = 'Apple 設備';
+    device = `Apple ${/iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : 'iPod'}`;
   } else if (/Android/i.test(ua)) {
-    device = 'Android 設備';
+    const match = ua.match(/Android.*?(Mobile|Tablet)/i);
+    device = `Android ${match ? match[1] : 'Device'}`;
   } else if (/Windows/i.test(ua)) {
-    device = 'Windows 設備';
+    device = 'Windows Device';
   } else if (/Macintosh/i.test(ua)) {
-    device = 'Mac 設備';
+    device = 'Mac Device';
   }
   return device;
 }
 
-async function handleCheckin(type) {
-  const user = firebase.auth().currentUser;
-  if (!user) {
-    alert('請先登入！');
-    return;
-  }
+async function handleCheckin(type, name, location, lang, statusElement) {
+  const translations = {
+    zh: {
+      success: '打卡成功！',
+      fail: '打卡失敗：',
+      ipError: '您的 IP 不在白名單內，無法打卡！',
+      inputError: '請輸入姓名和選擇地點！'
+    },
+    vi: {
+      success: 'Chấm công thành công!',
+      fail: 'Chấm công thất bại:',
+      ipError: 'IP của bạn không nằm trong danh sách trắng, không thể chấm công!',
+      inputError: 'Vui lòng nhập tên và chọn địa điểm!'
+    },
+    en: {
+      success: 'Check-in successful!',
+      fail: 'Check-in failed:',
+      ipError: 'Your IP is not in the whitelist, cannot check-in!',
+      inputError: 'Please enter name and select location!'
+    }
+  };
 
-  const name = document.getElementById('name').value;
-  const location = document.getElementById('location').value;
   if (!name || !location) {
-    alert('請輸入姓名和選擇地點！');
+    statusElement.textContent = translations[lang].inputError;
+    statusElement.classList.remove('text-green-600', 'hidden');
+    statusElement.classList.add('text-red-600');
+    setTimeout(() => statusElement.classList.add('hidden'), 3000);
     return;
   }
 
   const userIP = await getUserIP();
   if (!userIP || !ipWhitelist.includes(userIP)) {
-    alert('您的 IP 不在白名單內，無法打卡！');
+    statusElement.textContent = translations[lang].ipError;
+    statusElement.classList.remove('text-green-600', 'hidden');
+    statusElement.classList.add('text-red-600');
+    setTimeout(() => statusElement.classList.add('hidden'), 3000);
     return;
   }
 
@@ -52,7 +72,6 @@ async function handleCheckin(type) {
 
   try {
     await db.collection('checkins').add({
-      userId: user.uid,
       name: name,
       location: location,
       type: type,
@@ -60,9 +79,14 @@ async function handleCheckin(type) {
       device: device,
       ip: userIP
     });
-    alert(type === 'checkin' ? '上班打卡成功！' : '下班打卡成功！');
-    loadCheckinRecords(user.uid);
+    statusElement.textContent = translations[lang].success;
+    statusElement.classList.remove('text-red-600', 'hidden');
+    statusElement.classList.add('text-green-600');
+    setTimeout(() => statusElement.classList.add('hidden'), 3000);
   } catch (error) {
-    alert('打卡失敗：' + error.message);
+    statusElement.textContent = `${translations[lang].fail} ${error.message}`;
+    statusElement.classList.remove('text-green-600', 'hidden');
+    statusElement.classList.add('text-red-600');
+    setTimeout(() => statusElement.classList.add('hidden'), 3000);
   }
 }
