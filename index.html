@@ -21,16 +21,14 @@
       </select>
       <button id="checkin-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">上班打卡</button>
       <button id="checkout-btn" class="w-full bg-orange-600 text-white p-3 rounded-lg hover:bg-orange-700 transition-colors duration-200">下班打卡</button>
-      <p id="checkin-status" class="mt-4 text-center text-green-600 font-medium hidden"></p>
+      <div id="checkin-status" class="mt-4 text-center font-medium hidden"></div>
     </div>
-    <div class="mt-4 text-center">
-      <a href="/admin.html" class="text-indigo-600 hover:underline">前往管理者頁面</a>
-    </div>
+    <!-- 管理者頁面連結已移除 -->
   </div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-    import { getFirestore, collection, addDoc, getDocs } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+    import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
     import { getUserIP, getDeviceInfo, getIPWhitelist, handleCheckin } from '/js/functions.js';
 
     // Firebase 配置
@@ -40,7 +38,7 @@
       projectId: "employee-checkin-system",
       storageBucket: "employee-checkin-system.firebasestorage.app",
       messagingSenderId: "646412258577",
-      appId: "1: retention:web:7f32d3c069c415c9b190b0"
+      appId: "1:646412258577:web:7f32d3c069c415c9b190b0"
     };
 
     // 初始化 Firebase
@@ -67,7 +65,10 @@
         success: '打卡成功！',
         fail: '打卡失敗：',
         ipError: '您的 IP 不在白名單內，無法打卡！',
-        inputError: '請輸入姓名和選擇地點！'
+        inputError: '請輸入姓名和選擇地點！',
+        noCheckinRecord: '找不到今天的上班打卡記錄，是否忘記上班打卡？',
+        confirmCheckout: '確認直接下班打卡',
+        cancelCheckout: '取消'
       },
       vi: {
         title: 'Hệ thống chấm công nhân viên',
@@ -78,7 +79,10 @@
         success: 'Chấm công thành công!',
         fail: 'Chấm công thất bại:',
         ipError: 'IP của bạn không nằm trong danh sách trắng, không thể chấm công!',
-        inputError: 'Vui lòng nhập tên và chọn địa điểm!'
+        inputError: 'Vui lòng nhập tên và chọn địa điểm!',
+        noCheckinRecord: 'Không tìm thấy bản ghi chấm công vào hôm nay, bạn có quên chấm công vào không?',
+        confirmCheckout: 'Xác nhận chấm công ra',
+        cancelCheckout: 'Hủy'
       },
       en: {
         title: 'Employee Check-in System',
@@ -89,7 +93,10 @@
         success: 'Check-in successful!',
         fail: 'Check-in failed:',
         ipError: 'Your IP is not in the whitelist, cannot check-in!',
-        inputError: 'Please enter name and select location!'
+        inputError: 'Please enter name and select location!',
+        noCheckinRecord: 'No check-in record found for today, did you forget to check in?',
+        confirmCheckout: 'Confirm check-out',
+        cancelCheckout: 'Cancel'
       }
     };
 
