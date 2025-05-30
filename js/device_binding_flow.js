@@ -4,10 +4,11 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { 
   getAuth, 
-  signInWithPopup, 
+  signInWithRedirect, 
   GoogleAuthProvider,
   onAuthStateChanged,
-  signOut 
+  signOut,
+  getRedirectResult 
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { 
   getFirestore, 
@@ -263,10 +264,50 @@ async function handleFirstTimeLogin(user) {
 
 // 6. 主要登入流程
 async function initializeAuthFlow() {
+  // 處理重定向登入結果
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      // 用戶已通過重定向登入
+      console.log('重定向登入成功:', result.user);
+      
+      // 生成裝置指紋
+      const deviceFingerprint = await generateDeviceFingerprint();
+      
+      // 檢查裝置綁定狀態
+      const bindingStatus = await checkUserDeviceBinding(result.user.uid, deviceFingerprint);
+      
+      if (!bindingStatus.bound && (bindingStatus.reason === 'not_bound' || bindingStatus.reason === 'user_not_found')) {
+        // 用戶未綁定，顯示首次登入流程
+        handleFirstTimeLogin(result.user);
+        document.getElementById('checkin-section').classList.add('hidden');
+        document.getElementById('app').classList.add('hidden');
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('重定向登入失敗:', error);
+    const loginContainer = document.getElementById('login-container');
+    loginContainer.innerHTML = `
+      <div class="bg-white p-6 rounded-xl shadow-lg">
+        <h2 class="text-2xl font-bold text-red-600 mb-4">登入失敗</h2>
+        <p class="mb-4">登入過程中發生錯誤: ${error.message}</p>
+        <button id="retry-login-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">重試登入</button>
+      </div>
+    `;
+    
+    document.getElementById('retry-login-btn').addEventListener('click', () => {
+      window.location.reload();
+    });
+    
+    return;
+  }
+
   // 檢查用戶是否已登入
   onAuthStateChanged(auth, async (user) => {
     const loginContainer = document.getElementById('login-container');
     const checkinSection = document.getElementById('checkin-section');
+    const appContainer = document.getElementById('app');
     
     if (user) {
       // 用戶已登入
@@ -281,7 +322,13 @@ async function initializeAuthFlow() {
       if (bindingStatus.bound) {
         // 裝置已綁定，顯示打卡介面
         loginContainer.classList.add('hidden');
+        appContainer.classList.remove('hidden');
         checkinSection.classList.remove('hidden');
+        
+        // 更新用戶資訊顯示
+        document.getElementById('user-name-display').textContent = bindingStatus.userData.displayName;
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-avatar').src = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(bindingStatus.userData.displayName || 'User');
         
         // 自動填入員工姓名並鎖定
         const nameInput = document.getElementById('name');
@@ -310,10 +357,12 @@ async function initializeAuthFlow() {
           });
         });
         
+        appContainer.classList.add('hidden');
         checkinSection.classList.add('hidden');
       } else if (bindingStatus.reason === 'not_bound' || bindingStatus.reason === 'user_not_found') {
         // 用戶未綁定，顯示首次登入流程
         handleFirstTimeLogin(user);
+        appContainer.classList.add('hidden');
         checkinSection.classList.add('hidden');
       } else {
         // 發生錯誤
@@ -336,6 +385,7 @@ async function initializeAuthFlow() {
           });
         });
         
+        appContainer.classList.add('hidden');
         checkinSection.classList.add('hidden');
       }
     } else {
@@ -352,17 +402,22 @@ async function initializeAuthFlow() {
       `;
       
       document.getElementById('google-login-btn').addEventListener('click', () => {
-        signInWithPopup(auth, provider)
+        signInWithRedirect(auth, provider)
           .catch((error) => {
             console.error('Google 登入失敗:', error);
             alert(`登入失敗: ${error.message}`);
           });
       });
       
+      appContainer.classList.add('hidden');
       checkinSection.classList.add('hidden');
     }
   });
 }
 
 // 導出函數供 HTML 使用
-export { initializeAuthFlow };
+export { 
+  initializeAuthFlow,
+  generateDeviceFingerprint,
+  checkUserDeviceBinding
+};
