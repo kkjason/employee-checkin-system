@@ -1,14 +1,14 @@
-// 裝置綁定與 Google 登入流程設計
+// 裝置綁定與 Email/Password 登入流程設計
 
 // 1. 初始化 Firebase Auth
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { 
   getAuth, 
-  signInWithRedirect, 
-  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
-  getRedirectResult 
+  sendPasswordResetEmail
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { 
   getFirestore, 
@@ -36,7 +36,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
 
 // 2. 裝置指紋生成函數
 async function generateDeviceFingerprint() {
@@ -194,12 +193,12 @@ async function handleFirstTimeLogin(user) {
       <p class="mb-4">請確認您的員工資訊：</p>
       <div class="space-y-4">
         <div>
-          <label class="block text-gray-700 mb-1">Google 帳號</label>
+          <label class="block text-gray-700 mb-1">電子郵件</label>
           <input type="text" id="user-email" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value="${user.email}" disabled>
         </div>
         <div>
           <label class="block text-gray-700 mb-1">員工姓名</label>
-          <input type="text" id="user-name" class="w-full p-2 border border-gray-300 rounded-lg" value="${user.displayName || ''}" placeholder="請輸入您的姓名">
+          <input type="text" id="user-name" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請輸入您的姓名">
         </div>
         <div>
           <label class="block text-gray-700 mb-1">工作地點</label>
@@ -262,47 +261,173 @@ async function handleFirstTimeLogin(user) {
   });
 }
 
-// 6. 主要登入流程
-async function initializeAuthFlow() {
-  // 處理重定向登入結果
-  try {
-    const result = await getRedirectResult(auth);
-    if (result) {
-      // 用戶已通過重定向登入
-      console.log('重定向登入成功:', result.user);
-      
-      // 生成裝置指紋
-      const deviceFingerprint = await generateDeviceFingerprint();
-      
-      // 檢查裝置綁定狀態
-      const bindingStatus = await checkUserDeviceBinding(result.user.uid, deviceFingerprint);
-      
-      if (!bindingStatus.bound && (bindingStatus.reason === 'not_bound' || bindingStatus.reason === 'user_not_found')) {
-        // 用戶未綁定，顯示首次登入流程
-        handleFirstTimeLogin(result.user);
-        document.getElementById('checkin-section').classList.add('hidden');
-        document.getElementById('app').classList.add('hidden');
-        return;
-      }
-    }
-  } catch (error) {
-    console.error('重定向登入失敗:', error);
-    const loginContainer = document.getElementById('login-container');
-    loginContainer.innerHTML = `
-      <div class="bg-white p-6 rounded-xl shadow-lg">
-        <h2 class="text-2xl font-bold text-red-600 mb-4">登入失敗</h2>
-        <p class="mb-4">登入過程中發生錯誤: ${error.message}</p>
-        <button id="retry-login-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">重試登入</button>
+// 6. 顯示登入表單
+function showLoginForm() {
+  const loginContainer = document.getElementById('login-container');
+  loginContainer.innerHTML = `
+    <div class="bg-white p-6 rounded-xl shadow-lg">
+      <h2 class="text-2xl font-bold text-indigo-700 mb-4">員工打卡系統</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-gray-700 mb-1">電子郵件</label>
+          <input type="email" id="login-email" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請輸入您的電子郵件">
+        </div>
+        <div>
+          <label class="block text-gray-700 mb-1">密碼</label>
+          <input type="password" id="login-password" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請輸入密碼">
+        </div>
+        <button id="login-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">登入</button>
+        <div class="text-center">
+          <button id="forgot-password-btn" class="text-indigo-600 hover:underline">忘記密碼？</button>
+        </div>
+        <div class="border-t border-gray-300 pt-4 mt-4">
+          <p class="text-center mb-2">還沒有帳號？</p>
+          <button id="register-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">註冊新帳號</button>
+        </div>
       </div>
-    `;
+    </div>
+  `;
+  
+  // 綁定登入按鈕事件
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
     
-    document.getElementById('retry-login-btn').addEventListener('click', () => {
-      window.location.reload();
-    });
+    if (!email || !password) {
+      alert('請輸入電子郵件和密碼');
+      return;
+    }
     
-    return;
-  }
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // 登入成功後，onAuthStateChanged 會處理後續流程
+    } catch (error) {
+      console.error('登入失敗:', error);
+      alert(`登入失敗: ${error.message}`);
+    }
+  });
+  
+  // 綁定註冊按鈕事件
+  document.getElementById('register-btn').addEventListener('click', () => {
+    showRegisterForm();
+  });
+  
+  // 綁定忘記密碼按鈕事件
+  document.getElementById('forgot-password-btn').addEventListener('click', () => {
+    showForgotPasswordForm();
+  });
+}
 
+// 7. 顯示註冊表單
+function showRegisterForm() {
+  const loginContainer = document.getElementById('login-container');
+  loginContainer.innerHTML = `
+    <div class="bg-white p-6 rounded-xl shadow-lg">
+      <h2 class="text-2xl font-bold text-indigo-700 mb-4">註冊新帳號</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-gray-700 mb-1">電子郵件</label>
+          <input type="email" id="register-email" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請輸入您的電子郵件">
+        </div>
+        <div>
+          <label class="block text-gray-700 mb-1">密碼</label>
+          <input type="password" id="register-password" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請輸入密碼 (至少 6 位)">
+        </div>
+        <div>
+          <label class="block text-gray-700 mb-1">確認密碼</label>
+          <input type="password" id="register-confirm-password" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請再次輸入密碼">
+        </div>
+        <button id="register-submit-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">註冊</button>
+        <div class="text-center">
+          <button id="back-to-login-btn" class="text-indigo-600 hover:underline">返回登入</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // 綁定註冊提交按鈕事件
+  document.getElementById('register-submit-btn').addEventListener('click', async () => {
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password').value;
+    const confirmPassword = document.getElementById('register-confirm-password').value;
+    
+    if (!email || !password) {
+      alert('請輸入電子郵件和密碼');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      alert('兩次輸入的密碼不一致');
+      return;
+    }
+    
+    if (password.length < 6) {
+      alert('密碼長度至少需要 6 位');
+      return;
+    }
+    
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      // 註冊成功後，onAuthStateChanged 會處理後續流程
+    } catch (error) {
+      console.error('註冊失敗:', error);
+      alert(`註冊失敗: ${error.message}`);
+    }
+  });
+  
+  // 綁定返回登入按鈕事件
+  document.getElementById('back-to-login-btn').addEventListener('click', () => {
+    showLoginForm();
+  });
+}
+
+// 8. 顯示忘記密碼表單
+function showForgotPasswordForm() {
+  const loginContainer = document.getElementById('login-container');
+  loginContainer.innerHTML = `
+    <div class="bg-white p-6 rounded-xl shadow-lg">
+      <h2 class="text-2xl font-bold text-indigo-700 mb-4">重設密碼</h2>
+      <p class="mb-4">請輸入您的電子郵件，我們將發送重設密碼的連結給您。</p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-gray-700 mb-1">電子郵件</label>
+          <input type="email" id="reset-email" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請輸入您的電子郵件">
+        </div>
+        <button id="reset-password-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">發送重設連結</button>
+        <div class="text-center">
+          <button id="back-to-login-btn" class="text-indigo-600 hover:underline">返回登入</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // 綁定重設密碼按鈕事件
+  document.getElementById('reset-password-btn').addEventListener('click', async () => {
+    const email = document.getElementById('reset-email').value.trim();
+    
+    if (!email) {
+      alert('請輸入電子郵件');
+      return;
+    }
+    
+    try {
+      await sendPasswordResetEmail(auth, email);
+      alert('重設密碼連結已發送到您的電子郵件，請查收');
+      showLoginForm();
+    } catch (error) {
+      console.error('發送重設密碼郵件失敗:', error);
+      alert(`發送失敗: ${error.message}`);
+    }
+  });
+  
+  // 綁定返回登入按鈕事件
+  document.getElementById('back-to-login-btn').addEventListener('click', () => {
+    showLoginForm();
+  });
+}
+
+// 9. 主要登入流程
+async function initializeAuthFlow() {
   // 檢查用戶是否已登入
   onAuthStateChanged(auth, async (user) => {
     const loginContainer = document.getElementById('login-container');
@@ -328,7 +453,6 @@ async function initializeAuthFlow() {
         // 更新用戶資訊顯示
         document.getElementById('user-name-display').textContent = bindingStatus.userData.displayName;
         document.getElementById('user-email').textContent = user.email;
-        document.getElementById('user-avatar').src = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(bindingStatus.userData.displayName || 'User');
         
         // 自動填入員工姓名並鎖定
         const nameInput = document.getElementById('name');
@@ -389,25 +513,8 @@ async function initializeAuthFlow() {
         checkinSection.classList.add('hidden');
       }
     } else {
-      // 用戶未登入，顯示登入按鈕
-      loginContainer.innerHTML = `
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-          <h2 class="text-2xl font-bold text-indigo-700 mb-4">員工打卡系統</h2>
-          <p class="mb-4">請使用您的 Google 帳號登入：</p>
-          <button id="google-login-btn" class="w-full bg-white border border-gray-300 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200 flex items-center justify-center">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-6 h-6 mr-2">
-            <span>使用 Google 帳號登入</span>
-          </button>
-        </div>
-      `;
-      
-      document.getElementById('google-login-btn').addEventListener('click', () => {
-        signInWithRedirect(auth, provider)
-          .catch((error) => {
-            console.error('Google 登入失敗:', error);
-            alert(`登入失敗: ${error.message}`);
-          });
-      });
+      // 用戶未登入，顯示登入表單
+      showLoginForm();
       
       appContainer.classList.add('hidden');
       checkinSection.classList.add('hidden');
