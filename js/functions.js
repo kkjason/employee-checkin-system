@@ -1,3 +1,5 @@
+import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
 export async function getUserIPs() {
   const ipList = [];
   
@@ -12,7 +14,7 @@ export async function getUserIPs() {
     console.error('無法從 ipify 獲取 IP:', error);
   }
   
-  // 方法2: 使用另一個 IP 服務作為備份
+  // 方法2: 使用 db-ip API 作為備份
   try {
     const response = await fetch('https://api.db-ip.com/v2/free/self');
     const data = await response.json();
@@ -23,7 +25,7 @@ export async function getUserIPs() {
     console.error('無法從 db-ip 獲取 IP:', error);
   }
   
-  // 方法3: 使用 WebRTC 獲取本地和公共 IP (如果可用)
+  // 方法3: 使用 WebRTC 獲取 IP（如果可用）
   try {
     const rtcIPs = await getWebRTCIPs();
     rtcIPs.forEach(ip => {
@@ -33,32 +35,6 @@ export async function getUserIPs() {
     });
   } catch (error) {
     console.error('無法通過 WebRTC 獲取 IP:', error);
-  }
-  
-  // 方法4: 嘗試從 HTTP 頭部獲取 IP (需要服務器支持)
-  try {
-    const response = await fetch('/get-client-ip', { 
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const data = await response.json();
-    
-    // 處理可能的 X-Forwarded-For 頭部 (可能包含多個 IP)
-    if (data.forwardedIPs) {
-      data.forwardedIPs.split(',').forEach(ip => {
-        const trimmedIP = ip.trim();
-        if (trimmedIP && !ipList.includes(trimmedIP)) {
-          ipList.push(trimmedIP);
-        }
-      });
-    }
-    
-    // 處理直接連接的 IP
-    if (data.remoteIP && !ipList.includes(data.remoteIP)) {
-      ipList.push(data.remoteIP);
-    }
-  } catch (error) {
-    console.error('無法從服務器獲取 IP 頭部信息:', error);
   }
   
   console.log('收集到的 IP 列表:', ipList);
@@ -144,7 +120,8 @@ export function getDeviceInfo() {
 
 export async function getIPWhitelist() {
   try {
-    const snapshot = await window.db.collection('whitelist').get();
+    const whitelistCollection = collection(window.db, 'whitelist');
+    const snapshot = await getDocs(whitelistCollection);
     return snapshot.docs.map(doc => doc.data().ip);
   } catch (error) {
     console.error('無法獲取 IP 白名單:', error);
@@ -217,7 +194,7 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
     statusElement.textContent = translations[lang].inputError;
     statusElement.classList.remove('text-green-600', 'hidden');
     statusElement.classList.add('text-red-600');
-    return; // 移除自動隱藏，讓訊息持續顯示
+    return;
   }
 
   // 顯示檢查中的訊息
@@ -234,14 +211,14 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
     statusElement.textContent = translations[lang].ipError;
     statusElement.classList.remove('text-green-600', 'text-blue-600', 'hidden');
     statusElement.classList.add('text-red-600');
-    return; // 移除自動隱藏，讓訊息持續顯示
+    return;
   }
 
   const device = getDeviceInfo();
   const timestamp = new Date().toLocaleString('zh-TW');
 
   try {
-    await window.db.collection('checkins').add({
+    await addDoc(collection(window.db, 'checkins'), {
       name: name,
       location: location,
       type: type,
@@ -252,11 +229,9 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
     statusElement.textContent = translations[lang].success;
     statusElement.classList.remove('text-red-600', 'text-blue-600', 'hidden');
     statusElement.classList.add('text-green-600');
-    // 成功訊息也持續顯示，不自動隱藏
   } catch (error) {
     statusElement.textContent = `${translations[lang].fail} ${error.message}`;
     statusElement.classList.remove('text-green-600', 'text-blue-600', 'hidden');
     statusElement.classList.add('text-red-600');
-    // 錯誤訊息也持續顯示，不自動隱藏
   }
 }
