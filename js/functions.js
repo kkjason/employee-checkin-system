@@ -1,5 +1,4 @@
 const db = firebase.firestore();
-const ipWhitelist = ['192.168.1.1', '203.0.113.0']; // 請替換為實際的 IP 白名單
 
 async function getUserIP() {
   try {
@@ -26,6 +25,16 @@ function getDeviceInfo() {
     device = 'Mac Device';
   }
   return device;
+}
+
+async function getIPWhitelist() {
+  try {
+    const snapshot = await db.collection('whitelist').get();
+    return snapshot.docs.map(doc => doc.data().ip);
+  } catch (error) {
+    console.error('無法獲取 IP 白名單:', error);
+    return [];
+  }
 }
 
 async function handleCheckin(type, name, location, lang, statusElement) {
@@ -59,6 +68,7 @@ async function handleCheckin(type, name, location, lang, statusElement) {
   }
 
   const userIP = await getUserIP();
+  const ipWhitelist = await getIPWhitelist();
   if (!userIP || !ipWhitelist.includes(userIP)) {
     statusElement.textContent = translations[lang].ipError;
     statusElement.classList.remove('text-green-600', 'hidden');
