@@ -1,3 +1,6 @@
+// 首先需要引入必要的 Firestore 函數
+import { collection, getDocs, addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
 export async function getUserIP() {
   try {
     const response = await fetch('https://api.ipify.org?format=json');
@@ -27,7 +30,9 @@ export function getDeviceInfo() {
 
 export async function getIPWhitelist() {
   try {
-    const snapshot = await window.db.collection('whitelist').get();
+    // 修正: 使用 Firebase v9+ 模組化語法
+    const whitelistCollection = collection(window.db, 'whitelist');
+    const snapshot = await getDocs(whitelistCollection);
     return snapshot.docs.map(doc => doc.data().ip);
   } catch (error) {
     console.error('無法獲取 IP 白名單:', error);
@@ -79,7 +84,9 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
   const timestamp = new Date().toLocaleString('zh-TW');
 
   try {
-    await window.db.collection('checkins').add({
+    // 修正: 使用 Firebase v9+ 模組化語法
+    const checkinsCollection = collection(window.db, 'checkins');
+    await addDoc(checkinsCollection, {
       name: name,
       location: location,
       type: type,
