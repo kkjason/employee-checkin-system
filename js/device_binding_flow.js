@@ -1,6 +1,3 @@
-// 裝置綁定與 Email/Password 登入流程設計
-
-// 1. 初始化 Firebase Auth
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { 
   getAuth, 
@@ -37,7 +34,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// 2. 裝置指紋生成函數
+// 裝置指紋生成函數
 async function generateDeviceFingerprint() {
   // 收集裝置資訊
   const screenInfo = `${screen.width}x${screen.height}x${screen.colorDepth}`;
@@ -93,7 +90,7 @@ async function hashString(str) {
   return hashHex;
 }
 
-// 3. 檢查用戶是否已綁定裝置
+// 檢查用戶是否已綁定裝置
 async function checkUserDeviceBinding(userId, deviceFingerprint) {
   try {
     // 檢查用戶是否存在
@@ -129,11 +126,18 @@ async function checkUserDeviceBinding(userId, deviceFingerprint) {
     return { bound: false, reason: 'not_bound' };
   } catch (error) {
     console.error('檢查裝置綁定失敗:', error);
+    if (error.code === 'permission-denied') {
+      return { 
+        bound: false, 
+        reason: 'permission_denied', 
+        error: '無法訪問用戶或設備數據，請聯繫管理員檢查 Firestore 權限設置'
+      };
+    }
     return { bound: false, reason: 'error', error: error.message };
   }
 }
 
-// 4. 綁定用戶與裝置
+// 綁定用戶與裝置
 async function bindUserToDevice(userId, userEmail, displayName, deviceFingerprint) {
   try {
     // 更新用戶資料，添加裝置指紋
@@ -179,13 +183,18 @@ async function bindUserToDevice(userId, userEmail, displayName, deviceFingerprin
     return { success: true };
   } catch (error) {
     console.error('綁定裝置失敗:', error);
+    if (error.code === 'permission-denied') {
+      return { 
+        success: false, 
+        error: '無法綁定設備，請聯繫管理員檢查 Firestore 權限設置'
+      };
+    }
     return { success: false, error: error.message };
   }
 }
 
-// 5. 首次登入流程
+// 首次登入流程
 async function handleFirstTimeLogin(user) {
-  // 顯示首次登入表單
   const loginContainer = document.getElementById('login-container');
   loginContainer.innerHTML = `
     <div class="bg-white p-6 rounded-xl shadow-lg">
@@ -261,7 +270,7 @@ async function handleFirstTimeLogin(user) {
   });
 }
 
-// 6. 顯示登入表單
+// 顯示登入表單
 function showLoginForm() {
   const loginContainer = document.getElementById('login-container');
   loginContainer.innerHTML = `
@@ -318,7 +327,7 @@ function showLoginForm() {
   });
 }
 
-// 7. 顯示註冊表單
+// 顯示註冊表單
 function showRegisterForm() {
   const loginContainer = document.getElementById('login-container');
   loginContainer.innerHTML = `
@@ -381,7 +390,7 @@ function showRegisterForm() {
   });
 }
 
-// 8. 顯示忘記密碼表單
+// 顯示忘記密碼表單
 function showForgotPasswordForm() {
   const loginContainer = document.getElementById('login-container');
   loginContainer.innerHTML = `
@@ -426,7 +435,7 @@ function showForgotPasswordForm() {
   });
 }
 
-// 9. 主要登入流程
+// 主要登入流程
 async function initializeAuthFlow() {
   // 檢查用戶是否已登入
   onAuthStateChanged(auth, async (user) => {
@@ -483,13 +492,31 @@ async function initializeAuthFlow() {
         
         appContainer.classList.add('hidden');
         checkinSection.classList.add('hidden');
+      } else if (bindingStatus.reason === 'permission_denied') {
+        // 權限錯誤
+        loginContainer.innerHTML = `
+          <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-red-600 mb-4">權限錯誤</h2>
+            <p class="mb-4">${bindingStatus.error}</p>
+            <button id="logout-btn" class="w-full bg-gray-200 text-gray-700 p-3 rounded-lg hover:bg-gray-300 transition-colors duration-200">登出</button>
+          </div>
+        `;
+        
+        document.getElementById('logout-btn').addEventListener('click', () => {
+          signOut(auth).then(() => {
+            window.location.reload();
+          });
+        });
+        
+        appContainer.classList.add('hidden');
+        checkinSection.classList.add('hidden');
       } else if (bindingStatus.reason === 'not_bound' || bindingStatus.reason === 'user_not_found') {
         // 用戶未綁定，顯示首次登入流程
         handleFirstTimeLogin(user);
         appContainer.classList.add('hidden');
         checkinSection.classList.add('hidden');
       } else {
-        // 發生錯誤
+        // 其他錯誤
         loginContainer.innerHTML = `
           <div class="bg-white p-6 rounded-xl shadow-lg">
             <h2 class="text-2xl font-bold text-red-600 mb-4">發生錯誤</h2>
@@ -522,9 +549,14 @@ async function initializeAuthFlow() {
   });
 }
 
-// 導出函數供 HTML 使用
+// 導出函數供其他模組使用
 export { 
   initializeAuthFlow,
   generateDeviceFingerprint,
-  checkUserDeviceBinding
+  checkUserDeviceBinding,
+  bindUserToDevice,
+  handleFirstTimeLogin,
+  showLoginForm,
+  showRegisterForm,
+  showForgotPasswordForm
 };
