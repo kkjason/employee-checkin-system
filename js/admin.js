@@ -77,45 +77,37 @@ export async function loadCheckinRecords(name = '', location = '', pageDirection
     recordsTable.innerHTML = '<tr><td colspan="4" class="py-4 text-center">載入中...</td></tr>';
     
     // 建立查詢條件
-    let q = collection(window.db, 'checkins');
+    let checkinsRef = collection(window.db, 'checkins');
     let constraints = [];
-    
-    // 加入篩選條件
-    if (name) {
-      constraints.push(where('name', '==', name));
-    }
-    if (location) {
-      constraints.push(where('location', '==', location));
-    }
     
     // 加入排序條件（依時間戳倒序）
     constraints.push(orderBy('timestamp', 'desc'));
+    
+    // 加入篩選條件 - 注意：如果同時使用 where 和 orderBy，需要在 Firebase 控制台建立複合索引
+    if (name) {
+      // 如果需要篩選姓名，建議先建立索引
+      constraints.unshift(where('name', '==', name));
+    }
     
     // 分頁控制
     if (pageDirection === 'next' && lastVisible) {
       constraints.push(startAfter(lastVisible));
       currentPage++;
-    } else if (pageDirection === 'prev' && firstVisible) {
-      // 獲取前一頁的資料需要重新查詢
+    } else if (pageDirection === 'prev' && firstVisible && currentPage > 1) {
+      // 回到第一頁
       currentPage--;
-      // 這裡的邏輯需要更複雜的實現，簡化版是重新從頭開始查詢
       if (currentPage === 1) {
-        // 如果是回到第一頁，直接重置
         lastVisible = null;
         firstVisible = null;
       } else {
-        // 這裡簡化處理，實際上需要更複雜的邏輯來獲取前一頁
-        // 在實際應用中，可能需要保存每一頁的第一條記錄
+        // 簡化處理：重新從頭開始查詢到前一頁
+        // 注意：這種方法在大量數據時效率不高，但實現簡單
         lastVisible = null;
         firstVisible = null;
-        for (let i = 1; i < currentPage; i++) {
-          const tempQuery = query(q, ...constraints, limit(pageSize));
-          const tempSnapshot = await getDocs(tempQuery);
-          if (!tempSnapshot.empty) {
-            lastVisible = tempSnapshot.docs[tempSnapshot.docs.length - 1];
-          }
-        }
-        constraints.push(startAfter(lastVisible));
+        let tempQuery = query(checkinsRef, ...constraints);
+        let tempSnapshot = await getDocs(tempQuery);
+        let pages = Math.ceil(tempSnapshot.size / pageSize);
+        currentPage = Math.min(currentPage, pages);
       }
     } else {
       // 第一頁或重新查詢
@@ -128,7 +120,7 @@ export async function loadCheckinRecords(name = '', location = '', pageDirection
     constraints.push(limit(pageSize));
     
     // 執行查詢
-    q = query(q, ...constraints);
+    const q = query(checkinsRef, ...constraints);
     const snapshot = await getDocs(q);
     
     // 更新分頁控制變數
@@ -137,8 +129,14 @@ export async function loadCheckinRecords(name = '', location = '', pageDirection
       firstVisible = snapshot.docs[0];
     }
     
-    // 獲取總記錄數（簡化版，實際應用可能需要更複雜的計數方法）
-    const countQuery = query(collection(window.db, 'checkins'));
+    // 獲取總記錄數（簡化版）
+    // 注意：在實際應用中，應該使用更高效的方法來計算總記錄數
+    let countQuery;
+    if (name) {
+      countQuery = query(checkinsRef, where('name', '==', name));
+    } else {
+      countQuery = query(checkinsRef);
+    }
     const countSnapshot = await getDocs(countQuery);
     totalRecords = countSnapshot.size;
     
@@ -227,6 +225,20 @@ export async function loadCheckinRecords(name = '', location = '', pageDirection
     console.error('載入打卡紀錄失敗:', error);
     const recordsTable = document.getElementById('checkin-records');
     recordsTable.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-600">載入失敗: ${error.message}</td></tr>`;
+    
+    // 如果是索引錯誤，提示用戶建立索引
+    if (error.message && error.message.includes('requires an index')) {
+      const indexUrl = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]+/);
+      if (indexUrl) {
+        recordsTable.innerHTML += `
+          <tr><td colspan="4" class="py-2 text-center">
+            <p>需要建立 Firestore 索引，請點擊下方連結：</p>
+            <a href="${indexUrl[0]}" target="_blank" class="text-blue-600 hover:underline">建立索引</a>
+            <p class="mt-2 text-sm">建立索引後，請重新整理頁面</p>
+          </td></tr>
+        `;
+      }
+    }
   }
 }
 
