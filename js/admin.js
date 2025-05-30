@@ -8,15 +8,16 @@ export function loadIPWhitelist() {
   // 修正: 使用 Firebase v9+ 模組化語法
   const whitelistCollection = collection(window.db, 'whitelist');
   getDocs(whitelistCollection).then(snapshot => {
-    snapshot.forEach(document => {
-      const ip = document.data().ip;
+    // 修正: 將參數名稱從 document 改為 docSnapshot，避免與全域 document 衝突
+    snapshot.forEach(docSnapshot => {
+      const ip = docSnapshot.data().ip;
       const li = document.createElement('li');
       li.className = 'flex justify-between items-center p-2 border-b border-gray-200';
       li.innerHTML = `
         <span>${ip}</span>
         <div>
-          <button class="edit-ip text-blue-600 hover:underline mr-2" data-id="${document.id}" data-ip="${ip}">編輯</button>
-          <button class="delete-ip text-red-600 hover:underline" data-id="${document.id}">刪除</button>
+          <button class="edit-ip text-blue-600 hover:underline mr-2" data-id="${docSnapshot.id}" data-ip="${ip}">編輯</button>
+          <button class="delete-ip text-red-600 hover:underline" data-id="${docSnapshot.id}">刪除</button>
         </div>
       `;
       ipList.appendChild(li);
