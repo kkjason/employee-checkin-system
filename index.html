@@ -4,41 +4,505 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>員工打卡系統</title>
-  <script type="module" src="js/device_binding_flow.js"></script>
-  <script type="module" src="js/functions.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"></script>
+  <script type="module">
+    // 匯入必要的模組
+    import { initializeAuthFlow } from './js/device_binding_flow.js';
+    import { handleCheckin, getIPWhitelist, getDeviceInfo } from './js/functions.js';
+
+    // 語言翻譯對象
+    const translations = {
+      zh: {
+        title: '員工打卡系統',
+        name: '姓名',
+        location: '地點',
+        checkin: '上班打卡',
+        checkout: '下班打卡',
+        selectLocation: '請選擇地點',
+        email: '電子郵件',
+        password: '密碼',
+        login: '登入',
+        forgotPassword: '忘記密碼？',
+        register: '註冊新帳號',
+        registerTitle: '註冊新帳號',
+        confirmPassword: '確認密碼',
+        backToLogin: '返回登入',
+        resetPassword: '重設密碼',
+        resetPasswordPrompt: '請輸入您的電子郵件，我們將發送重設密碼的連結給您。',
+        sendResetLink: '發送重設連結',
+        firstTimeSetup: '首次登入設定',
+        confirmEmployeeInfo: '請確認您的員工資訊：',
+        employeeName: '員工姓名',
+        workLocation: '工作地點',
+        bindingAgreement: '我同意將此裝置綁定至我的帳號，並且了解每個裝置只能綁定一個員工帳號',
+        completeBinding: '完成綁定',
+        cancel: '取消',
+        deviceConflict: '裝置綁定衝突',
+        deviceConflictMessage: '此裝置已綁定到其他員工帳號，無法使用您的帳號登入。',
+        contactAdmin: '請聯絡管理員解除綁定，或使用您的專屬裝置登入。',
+        logout: '登出',
+        error: '發生錯誤',
+        errorMessage: '檢查裝置綁定時發生錯誤：',
+        retry: '重試'
+      },
+      vi: {
+        title: 'Hệ thống chấm công nhân viên',
+        name: 'Tên',
+        location: 'Địa điểm',
+        checkin: 'Chấm công vào',
+        checkout: 'Chấm công ra',
+        selectLocation: 'Vui lòng chọn địa điểm',
+        email: 'Email',
+        password: 'Mật khẩu',
+        login: 'Đăng nhập',
+        forgotPassword: 'Quên mật khẩu?',
+        register: 'Đăng ký tài khoản mới',
+        registerTitle: 'Đăng ký tài khoản mới',
+        confirmPassword: 'Xác nhận mật khẩu',
+        backToLogin: 'Quay lại đăng nhập',
+        resetPassword: 'Đặt lại mật khẩu',
+        resetPasswordPrompt: 'Vui lòng nhập email của bạn, chúng tôi sẽ gửi liên kết đặt lại mật khẩu.',
+        sendResetLink: 'Gửi liên kết đặt lại',
+        firstTimeSetup: 'Thiết lập đăng nhập lần đầu',
+        confirmEmployeeInfo: 'Vui lòng xác nhận thông tin nhân viên của bạn:',
+        employeeName: 'Tên nhân viên',
+        workLocation: 'Địa điểm làm việc',
+        bindingAgreement: 'Tôi đồng ý liên kết thiết bị này với tài khoản của mình và hiểu rằng mỗi thiết bị chỉ có thể liên kết với một tài khoản nhân viên.',
+        completeBinding: 'Hoàn tất liên kết',
+        cancel: 'Hủy',
+        deviceConflict: 'Xung đột liên kết thiết bị',
+        deviceConflictMessage: 'Thiết bị này đã được liên kết với tài khoản nhân viên khác, không thể đăng nhập bằng tài khoản của bạn.',
+        contactAdmin: 'Vui lòng liên hệ quản trị viên để hủy liên kết, hoặc sử dụng thiết bị riêng của bạn để đăng nhập.',
+        logout: 'Đăng xuất',
+        error: 'Lỗi xảy ra',
+        errorMessage: 'Lỗi khi kiểm tra liên kết thiết bị:',
+        retry: 'Thử lại'
+      },
+      en: {
+        title: 'Employee Check-in System',
+        name: 'Name',
+        location: 'Location',
+        checkin: 'Check-in',
+        checkout: 'Check-out',
+        selectLocation: 'Please select a location',
+        email: 'Email',
+        password: 'Password',
+        login: 'Login',
+        forgotPassword: 'Forgot Password?',
+        register: 'Register New Account',
+        registerTitle: 'Register New Account',
+        confirmPassword: 'Confirm Password',
+        backToLogin: 'Back to Login',
+        resetPassword: 'Reset Password',
+        resetPasswordPrompt: 'Please enter your email, and we will send you a password reset link.',
+        sendResetLink: 'Send Reset Link',
+        firstTimeSetup: 'First-Time Login Setup',
+        confirmEmployeeInfo: 'Please confirm your employee information:',
+        employeeName: 'Employee Name',
+        workLocation: 'Work Location',
+        bindingAgreement: 'I agree to bind this device to my account and understand that each device can only be bound to one employee account.',
+        completeBinding: 'Complete Binding',
+        cancel: 'Cancel',
+        deviceConflict: 'Device Binding Conflict',
+        deviceConflictMessage: 'This device is already bound to another employee account and cannot be used to log in with your account.',
+        contactAdmin: 'Please contact the administrator to unbind, or use your dedicated device to log in.',
+        logout: 'Logout',
+        error: 'Error Occurred',
+        errorMessage: 'Error checking device binding:',
+        retry: 'Retry'
+      }
+    };
+
+    // 當前語言，預設為中文
+    let currentLang = localStorage.getItem('lang') || 'zh';
+
+    // 設置語言
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('lang', lang);
+      updateUILanguage();
+      updateDynamicForms();
+    }
+
+    // 更新主頁面 UI 語言
+    function updateUILanguage() {
+      document.title = translations[currentLang].title;
+      document.getElementById('title').textContent = translations[currentLang].title;
+      const nameLabel = document.querySelector('label[for="name"]');
+      if (nameLabel) nameLabel.textContent = translations[currentLang].name;
+      const locationLabel = document.querySelector('label[for="location"]');
+      if (locationLabel) locationLabel.textContent = translations[currentLang].location;
+      const locationSelect = document.getElementById('location');
+      if (locationSelect) locationSelect.options[0].text = translations[currentLang].selectLocation;
+      document.getElementById('checkin-btn').textContent = translations[currentLang].checkin;
+      document.getElementById('checkout-btn').textContent = translations[currentLang].checkout;
+
+      // 更新語言按鈕狀態
+      document.getElementById('lang-zh').classList.toggle('bg-indigo-600', currentLang === 'zh');
+      document.getElementById('lang-zh').classList.toggle('bg-gray-400', currentLang !== 'zh');
+      document.getElementById('lang-vi').classList.toggle('bg-indigo-600', currentLang === 'vi');
+      document.getElementById('lang-vi').classList.toggle('bg-gray-400', currentLang !== 'vi');
+      document.getElementById('lang-en').classList.toggle('bg-indigo-600', currentLang === 'en');
+      document.getElementById('lang-en').classList.toggle('bg-gray-400', currentLang !== 'en');
+    }
+
+    // 更新動態生成的表單語言
+    function updateDynamicForms() {
+      const loginContainer = document.getElementById('login-container');
+      if (!loginContainer) return;
+
+      // 根據當前顯示的表單類型更新語言
+      const formTitle = loginContainer.querySelector('h2');
+      if (!formTitle) return;
+
+      if (formTitle.textContent.includes(translations.zh.login) ||
+          formTitle.textContent.includes(translations.vi.login) ||
+          formTitle.textContent.includes(translations.en.login)) {
+        showLoginForm();
+      } else if (formTitle.textContent.includes(translations.zh.registerTitle) ||
+                 formTitle.textContent.includes(translations.vi.registerTitle) ||
+                 formTitle.textContent.includes(translations.en.registerTitle)) {
+        showRegisterForm();
+      } else if (formTitle.textContent.includes(translations.zh.resetPassword) ||
+                 formTitle.textContent.includes(translations.vi.resetPassword) ||
+                 formTitle.textContent.includes(translations.en.resetPassword)) {
+        showForgotPasswordForm();
+      } else if (formTitle.textContent.includes(translations.zh.firstTimeSetup) ||
+                 formTitle.textContent.includes(translations.vi.firstTimeSetup) ||
+                 formTitle.textContent.includes(translations.en.firstTimeSetup)) {
+        // 首次登入表單需要特殊處理，因為它需要用戶資料
+        const userEmail = document.getElementById('user-email')?.value || '';
+        showFirstTimeLoginForm({ email: userEmail });
+      } else if (formTitle.textContent.includes(translations.zh.deviceConflict) ||
+                 formTitle.textContent.includes(translations.vi.deviceConflict) ||
+                 formTitle.textContent.includes(translations.en.deviceConflict)) {
+        showDeviceConflictForm();
+      } else if (formTitle.textContent.includes(translations.zh.error) ||
+                 formTitle.textContent.includes(translations.vi.error) ||
+                 formTitle.textContent.includes(translations.en.error)) {
+        showErrorForm();
+      }
+    }
+
+    // 修改後的顯示登入表單函數
+    function showLoginForm() {
+      const loginContainer = document.getElementById('login-container');
+      loginContainer.innerHTML = `
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-bold text-indigo-700 mb-4">${translations[currentLang].login}</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].email}</label>
+              <input type="email" id="login-email" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="${translations[currentLang].email}">
+            </div>
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].password}</label>
+              <input type="password" id="login-password" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="${translations[currentLang].password}">
+            </div>
+            <button id="login-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">${translations[currentLang].login}</button>
+            <div class="text-center">
+              <button id="forgot-password-btn" class="text-indigo-600 hover:underline">${translations[currentLang].forgotPassword}</button>
+            </div>
+            <div class="border-t border-gray-300 pt-4 mt-4">
+              <p class="text-center mb-2">${translations[currentLang].register}?</p>
+              <button id="register-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">${translations[currentLang].register}</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 綁定事件
+      document.getElementById('login-btn').addEventListener('click', async () => {
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+        if (!email || !password) {
+          alert(translations[currentLang].inputError || '請輸入電子郵件和密碼');
+          return;
+        }
+        try {
+          await signInWithEmailAndPassword(window.auth, email, password);
+        } catch (error) {
+          console.error('登入失敗:', error);
+          alert(`${translations[currentLang].fail || '登入失敗'}: ${error.message}`);
+        }
+      });
+
+      document.getElementById('register-btn').addEventListener('click', () => {
+        showRegisterForm();
+      });
+
+      document.getElementById('forgot-password-btn').addEventListener('click', () => {
+        showForgotPasswordForm();
+      });
+    }
+
+    // 修改後的顯示註冊表單函數
+    function showRegisterForm() {
+      const loginContainer = document.getElementById('login-container');
+      loginContainer.innerHTML = `
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-bold text-indigo-700 mb-4">${translations[currentLang].registerTitle}</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].email}</label>
+              <input type="email" id="register-email" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="${translations[currentLang].email}">
+            </div>
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].password}</label>
+              <input type="password" id="register-password" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="${translations[currentLang].password}">
+            </div>
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].confirmPassword}</label>
+              <input type="password" id="register-confirm-password" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="${translations[currentLang].confirmPassword}">
+            </div>
+            <button id="register-submit-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">${translations[currentLang].register}</button>
+            <div class="text-center">
+              <button id="back-to-login-btn" class="text-indigo-600 hover:underline">${translations[currentLang].backToLogin}</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 綁定事件
+      document.getElementById('register-submit-btn').addEventListener('click', async () => {
+        const email = document.getElementById('register-email').value.trim();
+        const password = document.getElementById('register-password').value;
+        const confirmPassword = document.getElementById('register-confirm-password').value;
+        if (!email || !password) {
+          alert(translations[currentLang].inputError || '請輸入電子郵件和密碼');
+          return;
+        }
+        if (password !== confirmPassword) {
+          alert(translations[currentLang].passwordMismatch || '兩次輸入的密碼不一致');
+          return;
+        }
+        if (password.length < 6) {
+          alert(translations[currentLang].passwordLengthError || '密碼長度至少需要 6 位');
+          return;
+        }
+        try {
+          await createUserWithEmailAndPassword(window.auth, email, password);
+        } catch (error) {
+          console.error('註冊失敗:', error);
+          alert(`${translations[currentLang].fail || '註冊失敗'}: ${error.message}`);
+        }
+      });
+
+      document.getElementById('back-to-login-btn').addEventListener('click', () => {
+        showLoginForm();
+      });
+    }
+
+    // 修改後的顯示忘記密碼表單函數
+    function showForgotPasswordForm() {
+      const loginContainer = document.getElementById('login-container');
+      loginContainer.innerHTML = `
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-bold text-indigo-700 mb-4">${translations[currentLang].resetPassword}</h2>
+          <p class="mb-4">${translations[currentLang].resetPasswordPrompt}</p>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].email}</label>
+              <input type="email" id="reset '
+
+      // 綁定事件
+      document.getElementById('reset-password-btn').addEventListener('click', async () => {
+        const email = document.getElementById('reset-email').value.trim();
+        if (!email) {
+          alert(translations[currentLang].inputError || '請輸入電子郵件');
+          return;
+        }
+        try {
+          await sendPasswordResetEmail(window.auth, email);
+          alert(translations[currentLang].resetLinkSent || '重設密碼連結已發送到您的電子郵件，請查收');
+          showLoginForm();
+        } catch (error) {
+          console.error('發送重設密碼郵件失敗:', error);
+          alert(`${translations[currentLang].fail || '發送失敗'}: ${error.message}`);
+        }
+      });
+
+      document.getElementById('back-to-login-btn').addEventListener('click', () => {
+        showLoginForm();
+      });
+    }
+
+    // 修改後的顯示首次登入表單函數
+    function showFirstTimeLoginForm(user) {
+      const loginContainer = document.getElementById('login-container');
+      loginContainer.innerHTML = `
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-bold text-indigo-700 mb-4">${translations[currentLang].firstTimeSetup}</h2>
+          <p class="mb-4">${translations[currentLang].confirmEmployeeInfo}</p>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].email}</label>
+              <input type="text" id="user-email" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value="${user.email}" disabled>
+            </div>
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].employeeName}</label>
+              <input type="text" id="user-name" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="${translations[currentLang].employeeName}">
+            </div>
+            <div>
+              <label class="block text-gray-700 mb-1">${translations[currentLang].workLocation}</label>
+              <select id="user-location" class="w-full p-2 border border-gray-300 rounded-lg">
+                <option value="宏匯">宏匯</option>
+              </select>
+            </div>
+            <div class="mt-2">
+              <label class="flex items-center">
+                <input type="checkbox" id="binding-agreement" class="mr-2">
+                <span>${translations[currentLang].bindingAgreement}</span>
+              </label>
+            </div>
+            <button id="complete-binding-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200 disabled:bg-gray-400" disabled>${translations[currentLang].completeBinding}</button>
+            <button id="cancel-binding-btn" class="w-full bg-gray-200 text-gray-700 p-3 rounded-lg hover:bg-gray-300 transition-colors duration-200">${translations[currentLang].cancel}</button>
+          </div>
+        </div>
+      `;
+
+      // 綁定事件
+      const agreementCheckbox = document.getElementById('binding-agreement');
+      const completeBindingBtn = document.getElementById('complete-binding-btn');
+
+      agreementCheckbox.addEventListener('change', () => {
+        completeBindingBtn.disabled = !agreementCheckbox.checked;
+      });
+
+      completeBindingBtn.addEventListener('click', async () => {
+        const userName = document.getElementById('user-name').value.trim();
+        const userLocation = document.getElementById('user-location').value;
+        if (!userName) {
+          alert(translations[currentLang].inputError || '請輸入您的姓名');
+          return;
+        }
+        const deviceFingerprint = await generateDeviceFingerprint();
+        const bindResult = await bindUserToDevice(user.uid, user.email, userName, deviceFingerprint);
+        if (bindResult.success) {
+          localStorage.setItem('userDisplayName', userName);
+          localStorage.setItem('userLocation', userLocation);
+          window.location.reload();
+        } else {
+          alert(`${translations[currentLang].fail || '綁定失敗'}: ${bindResult.error}`);
+        }
+      });
+
+      document.getElementById('cancel-binding-btn').addEventListener('click', () => {
+        signOut(window.auth).then(() => {
+          window.location.reload();
+        });
+      });
+    }
+
+    // 顯示裝置衝突表單
+    function showDeviceConflictForm() {
+      const loginContainer = document.getElementById('login-container');
+      loginContainer.innerHTML = `
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-bold text-red-600 mb-4">${translations[currentLang].deviceConflict}</h2>
+          <p class="mb-4">${translations[currentLang].deviceConflictMessage}</p>
+          <p class="mb-4">${translations[currentLang].contactAdmin}</p>
+          <button id="logout-btn" class="w-full bg-gray-200 text-gray-700 p-3 rounded-lg hover:bg-gray-300 transition-colors duration-200">${translations[currentLang].logout}</button>
+        </div>
+      `;
+
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        signOut(window.auth).then(() => {
+          window.location.reload();
+        });
+      });
+    }
+
+    // 顯示錯誤表單
+    function showErrorForm() {
+      const loginContainer = document.getElementById('login-container');
+      loginContainer.innerHTML = `
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-bold text-red-600 mb-4">${translations[currentLang].error}</h2>
+          <p class="mb-4">${translations[currentLang].errorMessage} ${bindingStatus.error || ''}</p>
+          <button id="retry-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">${translations[currentLang].retry}</button>
+          <button id="logout-btn" class="w-full bg-gray-200 text-gray-700 p-3 mt-2 rounded-lg hover:bg-gray-300 transition-colors duration-200">${translations[currentLang].logout}</button>
+        </div>
+      `;
+
+      document.getElementById('retry-btn').addEventListener('click', () => {
+        window.location.reload();
+      });
+
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        signOut(window.auth).then(() => {
+          window.location.reload();
+        });
+      });
+    }
+
+    // 初始化語言選擇按鈕
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('lang-zh').addEventListener('click', () => setLanguage('zh'));
+      document.getElementById('lang-vi').addEventListener('click', () => setLanguage('vi'));
+      document.getElementById('lang-en').addEventListener('click', () => setLanguage('en'));
+
+      // 初始化 Firebase 和打卡功能
+      window.db = getFirestore(window.app);
+      window.auth = getAuth(window.app);
+      initializeAuthFlow();
+
+      // 初始化語言
+      updateUILanguage();
+
+      // 綁定打卡按鈕事件
+      const nameInput = document.getElementById('name');
+      const locationSelect = document.getElementById('location');
+      const checkinBtn = document.getElementById('checkin-btn');
+      const checkoutBtn = document.getElementById('checkout-btn');
+      const statusElement = document.getElementById('status');
+
+      checkinBtn.addEventListener('click', () => {
+        handleCheckin('checkin', nameInput.value.trim(), locationSelect.value, currentLang, statusElement);
+      });
+
+      checkoutBtn.addEventListener('click', () => {
+        handleCheckin('checkout', nameInput.value.trim(), locationSelect.value, currentLang, statusElement);
+      });
+    });
+  </script>
 </head>
-<body class="bg-gray-100 flex flex-col items-center min-h-screen">
-  <div class="w-full max-w-4xl p-4">
-    <!-- 語言選擇按鈕 -->
-    <div class="flex justify-end space-x-2 mb-4">
-      <button id="lang-zh" class="lang-btn px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">中文</button>
-      <button id="lang-vi" class="lang-btn px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Tiếng Việt</button>
-      <button id="lang-en" class="lang-btn px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">English</button>
-    </div>
+<body class="bg-gray-100 font-sans">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div id="app" class="w-full max-w-md">
+      <!-- 語言選擇按鈕 -->
+      <div class="mb-4 flex justify-center space-x-2">
+        <button id="lang-zh" class="px-4 py-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200">中文</button>
+        <button id="lang-vi" class="px-4 py-2 rounded-lg text-white bg-gray-400 hover:bg-gray-500 transition-colors duration-200">Tiếng Việt</button>
+        <button id="lang-en" class="px-4 py-2 rounded-lg text-white bg-gray-400 hover:bg-gray-500 transition-colors duration-200">English</button>
+      </div>
 
-    <div id="login-container" class="w-full max-w-md mx-auto"></div>
-
-    <div id="app" class="hidden w-full">
-      <h1 class="text-3xl font-bold text-indigo-700 text-center mb-6">員工打卡系統</h1>
+      <div id="login-container" class="hidden"></div>
       
-      <div id="checkin-section" class="bg-white p-6 rounded-xl shadow-lg">
-        <div class="space-y-4">
-          <div>
-            <label class="block text-gray-700 mb-1" id="name-label">員工姓名</label>
-            <input type="text" id="name" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請輸入您的姓名">
+      <div id="checkin-section" class="hidden">
+        <h1 id="title" class="text-3xl font-bold text-center text-indigo-600 mb-6">員工打卡系統</h1>
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <div class="space-y-4">
+            <div>
+              <label for="name" class="block text-gray-700 mb-1">姓名</label>
+              <input type="text" id="name" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="請輸入姓名">
+            </div>
+            <div>
+              <label for="location" class="block text-gray-700 mb-1">地點</label>
+              <select id="location" class="w-full p-2 border border-gray-300 rounded-lg">
+                <option value="">請選擇地點</option>
+                <option value="宏匯">宏匯</option>
+              </select>
+            </div>
+            <div class="flex space-x-2">
+              <button id="checkin-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">上班打卡</button>
+              <button id="checkout-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">下班打卡</button>
+            </div>
+            <div id="status" class="mt-4 text-center font-medium hidden"></div>
           </div>
-          <div>
-            <label class="block text-gray-700 mb-1" id="location-label">打卡地點</label>
-            <select id="location" class="w-full p-2 border border-gray-300 rounded-lg">
-              <option value="宏匯">宏匯</option>
-            </select>
-          </div>
-          <div class="flex space-x-4">
-            <button id="checkin-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">上班打卡</button>
-            <button id="checkout-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">下班打卡</button>
-          </div>
-          <div id="status" class="hidden mt-4 text-center font-medium"></div>
         </div>
       </div>
     </div>
