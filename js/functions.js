@@ -1,4 +1,6 @@
-export async function getUserIP() {
+const db = firebase.firestore();
+
+async function getUserIP() {
   try {
     const response = await fetch('https://api.ipify.org?format=json');
     const data = await response.json();
@@ -9,7 +11,7 @@ export async function getUserIP() {
   }
 }
 
-export function getDeviceInfo() {
+function getDeviceInfo() {
   const ua = navigator.userAgent;
   let device = 'Unknown Device';
   if (/iPhone|iPad|iPod/i.test(ua)) {
@@ -25,9 +27,9 @@ export function getDeviceInfo() {
   return device;
 }
 
-export async function getIPWhitelist() {
+async function getIPWhitelist() {
   try {
-    const snapshot = await window.db.collection('whitelist').get();
+    const snapshot = await db.collection('whitelist').get();
     return snapshot.docs.map(doc => doc.data().ip);
   } catch (error) {
     console.error('無法獲取 IP 白名單:', error);
@@ -35,7 +37,7 @@ export async function getIPWhitelist() {
   }
 }
 
-export async function handleCheckin(type, name, location, lang, statusElement) {
+async function handleCheckin(type, name, location, lang, statusElement) {
   const translations = {
     zh: {
       success: '打卡成功！',
@@ -79,7 +81,7 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
   const timestamp = new Date().toLocaleString('zh-TW');
 
   try {
-    await window.db.collection('checkins').add({
+    await db.collection('checkins').add({
       name: name,
       location: location,
       type: type,
