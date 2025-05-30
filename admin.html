@@ -8,89 +8,97 @@
 </head>
 <body class="bg-gradient-to-r from-blue-100 to-indigo-100 min-h-screen p-4">
   <div class="container mx-auto">
-    <!-- 頁面標題 -->
-    <h1 class="text-3xl font-bold text-indigo-700 mb-6 text-center">員工打卡系統管理</h1>
-    
-    <!-- 管理區塊 -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- IP 白名單管理區塊 -->
-      <div class="bg-white p-6 rounded-xl shadow-lg">
-        <h2 class="text-2xl font-bold text-indigo-700 mb-4">IP 白名單管理</h2>
-        <div class="space-y-4">
-          <input id="ip-input" type="text" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="輸入 IP 位址 (例如 192.168.1.1)">
-          <button id="add-ip-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">新增 IP</button>
-          <h3 class="text-xl font-semibold text-indigo-700 mt-4">IP 白名單列表</h3>
-          <ul id="ip-list" class="space-y-2 max-h-96 overflow-y-auto"></ul>
-        </div>
-      </div>
+    <!-- 登入容器 -->
+    <div id="login-container" class="hidden"></div>
+
+    <!-- 管理頁面容器 -->
+    <div id="admin-container" class="hidden">
+      <!-- 頁面標題 -->
+      <h1 class="text-3xl font-bold text-indigo-700 mb-6 text-center">員工打卡系統管理</h1>
       
-      <!-- 打卡紀錄查詢區塊 -->
-      <div class="bg-white p-6 rounded-xl shadow-lg">
-        <h2 class="text-2xl font-bold text-indigo-700 mb-4">打卡紀錄查詢</h2>
-        <div class="space-y-4">
-          <div class="flex gap-2">
-            <input id="name-filter" type="text" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="依姓名篩選">
-            <select id="location-filter" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="">所有地點</option>
-              <option value="宏匯">宏匯</option>
-            </select>
+      <!-- 管理區塊 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- IP 白名單管理區塊 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-bold text-indigo-700 mb-4">IP 白名單管理</h2>
+          <div class="space-y-4">
+            <input id="ip-input" type="text" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="輸入 IP 位址 (例如 192.168.1.1)">
+            <button id="add-ip-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">新增 IP</button>
+            <h3 class="text-xl font-semibold text-indigo-700 mt-4">IP 白名單列表</h3>
+            <ul id="ip-list" class="space-y-2 max-h-96 overflow-y-auto"></ul>
           </div>
-          <button id="search-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">查詢</button>
         </div>
-      </div>
-    </div>
-    
-    <!-- 打卡紀錄列表區塊 -->
-    <div class="mt-6 bg-white p-6 rounded-xl shadow-lg">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-bold text-indigo-700">打卡紀錄列表</h2>
         
-        <!-- 顯示模式切換按鈕 -->
-        <div class="flex rounded-lg overflow-hidden">
-          <button id="original-mode-btn" class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none">原始記錄</button>
-          <button id="paired-mode-btn" class="px-4 py-2 bg-gray-400 text-white hover:bg-gray-500 focus:outline-none">配對記錄</button>
+        <!-- 打卡紀錄查詢區塊 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-bold text-indigo-700 mb-4">打卡紀錄查詢</h2>
+          <div class="space-y-4">
+            <div class="flex gap-2">
+              <input id="name-filter" type="text" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="依姓名篩選">
+              <select id="location-filter" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">所有地點</option>
+                <option value="宏匯">宏匯</option>
+              </select>
+            </div>
+            <button id="search-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">查詢</button>
+          </div>
         </div>
       </div>
       
-      <!-- 打卡紀錄表格 -->
-      <div class="overflow-x-auto">
-        <table class="min-w-full bg-white">
-          <thead class="bg-gray-100">
-            <tr>
-              <th class="py-3 px-4 text-left font-semibold text-gray-700">姓名</th>
-              <th class="py-3 px-4 text-left font-semibold text-gray-700">地點</th>
-              <th class="py-3 px-4 text-left font-semibold text-gray-700">上班時間/設備</th>
-              <th class="py-3 px-4 text-left font-semibold text-gray-700">下班時間/設備</th>
-            </tr>
-          </thead>
-          <tbody id="checkin-records">
-            <!-- 打卡紀錄將由 JavaScript 動態生成 -->
-          </tbody>
-        </table>
+      <!-- 打卡紀錄列表區塊 -->
+      <div class="mt-6 bg-white p-6 rounded-xl shadow-lg">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-2xl font-bold text-indigo-700">打卡紀錄列表</h2>
+          
+          <!-- 顯示模式切換按鈕 -->
+          <div class="flex rounded-lg overflow-hidden">
+            <button id="original-mode-btn" class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none">原始記錄</button>
+            <button id="paired-mode-btn" class="px-4 py-2 bg-gray-400 text-white hover:bg-gray-500 focus:outline-none">配對記錄</button>
+          </div>
+        </div>
+        
+        <!-- 打卡紀錄表格 -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full bg-white">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="py-3 px-4 text-left font-semibold text-gray-700">姓名</th>
+                <th class="py-3 px-4 text-left font-semibold text-gray-700">地點</th>
+                <th class="py-3 px-4 text-left font-semibold text-gray-700">上班時間/設備</th>
+                <th class="py-3 px-4 text-left font-semibold text-gray-700">下班時間/設備</th>
+              </tr>
+            </thead>
+            <tbody id="checkin-records">
+              <!-- 打卡紀錄將由 JavaScript 動態生成 -->
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- 分頁控制 -->
+        <div class="mt-4 flex justify-between items-center">
+          <div class="text-sm text-gray-600">
+            顯示 <span id="record-start">1</span> - <span id="record-end">20</span> 筆，共 <span id="record-total">0</span> 筆
+          </div>
+          <div class="flex gap-2">
+            <button id="prev-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">上一頁</button>
+            <button id="next-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">下一頁</button>
+          </div>
+        </div>
       </div>
       
-      <!-- 分頁控制 -->
-      <div class="mt-4 flex justify-between items-center">
-        <div class="text-sm text-gray-600">
-          顯示 <span id="record-start">1</span> - <span id="record-end">20</span> 筆，共 <span id="record-total">0</span> 筆
-        </div>
-        <div class="flex gap-2">
-          <button id="prev-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">上一頁</button>
-          <button id="next-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">下一頁</button>
-        </div>
+      <!-- 頁面底部導航 -->
+      <div class="mt-6 text-center">
+        <a href="/index.html" class="text-indigo-600 hover:underline">返回打卡頁面</a>
       </div>
-    </div>
-    
-    <!-- 頁面底部導航 -->
-    <div class="mt-6 text-center">
-      <a href="/index.html" class="text-indigo-600 hover:underline">返回打卡頁面</a>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
     import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit, startAfter, where } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
     import { loadIPWhitelist, loadCheckinRecords, toggleDisplayMode } from '/js/admin.js';
+    import { showLoginForm } from '/js/device_binding_flow.js';
 
     // Firebase 配置
     const firebaseConfig = {
@@ -105,9 +113,12 @@
     // 初始化 Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
     window.db = db; // 將 db 暴露給 admin.js 使用
 
     // DOM 元素
+    const loginContainer = document.getElementById('login-container');
+    const adminContainer = document.getElementById('admin-container');
     const ipInput = document.getElementById('ip-input');
     const addIpBtn = document.getElementById('add-ip-btn');
     const nameFilter = document.getElementById('name-filter');
@@ -117,6 +128,26 @@
     const nextPageBtn = document.getElementById('next-page');
     const originalModeBtn = document.getElementById('original-mode-btn');
     const pairedModeBtn = document.getElementById('paired-mode-btn');
+
+    // 管理員 UID 清單
+    const ADMIN_UIDS = ['YOUR_ADMIN_UID']; // 替換為實際管理員 UID
+
+    // 身份驗證狀態監聽
+    onAuthStateChanged(auth, (user) => {
+      if (user && ADMIN_UIDS.includes(user.uid)) {
+        // 用戶是管理員，顯示管理介面
+        loginContainer.classList.add('hidden');
+        adminContainer.classList.remove('hidden');
+        // 初始載入
+        loadIPWhitelist();
+        loadCheckinRecords();
+      } else {
+        // 非管理員或未登入，顯示登入表單
+        loginContainer.classList.remove('hidden');
+        adminContainer.classList.add('hidden');
+        showLoginForm();
+      }
+    });
 
     // 新增 IP
     addIpBtn.addEventListener('click', async () => {
@@ -153,15 +184,19 @@
     // 顯示模式切換
     originalModeBtn.addEventListener('click', () => {
       toggleDisplayMode('original');
+      originalModeBtn.classList.add('bg-indigo-600', 'text-white');
+      originalModeBtn.classList.remove('bg-gray-400');
+      pairedModeBtn.classList.add('bg-gray-400');
+      pairedModeBtn.classList.remove('bg-indigo-600', 'text-white');
     });
 
     pairedModeBtn.addEventListener('click', () => {
       toggleDisplayMode('paired');
+      pairedModeBtn.classList.add('bg-indigo-600', 'text-white');
+      pairedModeBtn.classList.remove('bg-gray-400');
+      originalModeBtn.classList.add('bg-gray-400');
+      originalModeBtn.classList.remove('bg-indigo-600', 'text-white');
     });
-
-    // 初始載入
-    loadIPWhitelist();
-    loadCheckinRecords();
   </script>
 </body>
 </html>
