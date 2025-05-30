@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>員工打卡系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"></script>
-  <script src="/js/functions.js"></script>
 </head>
 <body class="bg-gradient-to-r from-blue-100 to-indigo-100 flex items-center justify-center min-h-screen">
   <div id="app" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transform transition-all duration-300">
@@ -31,7 +28,11 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+    import { getFirestore, collection, addDoc, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+    import { handleCheckin, getIPWhitelist, getUserIP, getDeviceInfo } from '/js/functions.js';
+
     // Firebase 配置
     const firebaseConfig = {
   apiKey: "AIzaSyCv1ywEy0oaL8FNBLAEO-Ban5lMs26Y_gY",
@@ -43,7 +44,9 @@
     };
 
     // 初始化 Firebase
-    firebase.initializeApp(firebaseConfig);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    window.db = db; // 將 db 暴露給 functions.js 使用
 
     // DOM 元素
     const nameInput = document.getElementById('name');
@@ -99,7 +102,6 @@
       locationSelect.options[0].text = translations[lang].location;
       document.getElementById('checkin-btn').textContent = translations[lang].checkin;
       document.getElementById('checkout-btn').textContent = translations[lang].checkout;
-      // 重置狀態訊息以避免顯示舊語言
       checkinStatus.classList.add('hidden');
     }
 
@@ -113,12 +115,12 @@
     setLanguage('zh');
 
     // 上班/下班打卡
-    checkinBtn.addEventListener('click', () => {
-      handleCheckin('checkin', nameInput.value, locationSelect.value, currentLang, checkinStatus);
+    checkinBtn.addEventListener('click', async () => {
+      await handleCheckin('checkin', nameInput.value, locationSelect.value, currentLang, checkinStatus);
     });
 
-    checkoutBtn.addEventListener('click', () => {
-      handleCheckin('checkout', nameInput.value, locationSelect.value, currentLang, checkinStatus);
+    checkoutBtn.addEventListener('click', async () => {
+      await handleCheckin('checkout', nameInput.value, locationSelect.value, currentLang, checkinStatus);
     });
   </script>
 </body>
