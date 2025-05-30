@@ -1,355 +1,163 @@
-// 首先需要引入必要的 Firestore 函數
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit, startAfter, where, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-// 全域變數，用於分頁控制
-let lastVisible = null;
-let firstVisible = null;
-let currentPage = 1;
-let totalRecords = 0;
-let pageSize = 20;
-let currentRecords = [];
-let nameFilterValue = '';
-let locationFilterValue = '';
-let displayMode = 'original'; // 'original' 或 'paired'
+let lastDoc = null;
+let firstDoc = null;
+let displayMode = 'original';
+let currentNameFilter = '';
+let currentLocationFilter = '';
 
-// 載入 IP 白名單
-export function loadIPWhitelist() {
+export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
   ipList.innerHTML = '';
-  
-  // 使用 Firebase v9+ 模組化語法
-  const whitelistCollection = collection(window.db, 'whitelist');
-  getDocs(whitelistCollection).then(snapshot => {
-    // 將參數名稱從 document 改為 docSnapshot，避免與全域 document 衝突
-    snapshot.forEach(docSnapshot => {
-      const ip = docSnapshot.data().ip;
+  try {
+    const querySnapshot = await getDocs(collection(window.db, 'whitelist'));
+    querySnapshot.forEach((doc) => {
+      const ip = doc.data().ip;
       const li = document.createElement('li');
-      li.className = 'flex justify-between items-center p-2 border-b border-gray-200';
+      li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
       li.innerHTML = `
         <span>${ip}</span>
-        <div>
-          <button class="edit-ip text-blue-600 hover:underline mr-2" data-id="${docSnapshot.id}" data-ip="${ip}">編輯</button>
-          <button class="delete-ip text-red-600 hover:underline" data-id="${docSnapshot.id}">刪除</button>
-        </div>
+        <button class="text-red-600 hover:text-red-800 delete-ip-btn" data-id="${doc.id}">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+          </svg>
+        </button>
       `;
       ipList.appendChild(li);
     });
 
-    document.querySelectorAll('.edit-ip').forEach(button => {
-      button.addEventListener('click', async () => {
-        const id = button.dataset.id;
-        const newIP = prompt('輸入新的 IP 位址:', button.dataset.ip);
-        if (newIP) {
-          try {
-            // 使用 Firebase v9+ 模組化語法
-            const docRef = doc(window.db, 'whitelist', id);
-            await updateDoc(docRef, { ip: newIP });
-            loadIPWhitelist();
-          } catch (error) {
-            alert('更新失敗：' + error.message);
-          }
+    // 綁定刪除按鈕事件
+    document.querySelectorAll('.delete-ip-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        try {
+          await deleteDoc(doc(window.db, 'whitelist', id));
+          loadIPWhitelist();
+        } catch (error) {
+          console.error('刪除 IP 失敗:', error);
+          alert('刪除失敗: ' + error.message);
         }
       });
     });
-
-    document.querySelectorAll('.delete-ip').forEach(button => {
-      button.addEventListener('click', async () => {
-        if (confirm('確定刪除此 IP？')) {
-          try {
-            // 使用 Firebase v9+ 模組化語法
-            const docRef = doc(window.db, 'whitelist', button.dataset.id);
-            await deleteDoc(docRef);
-            loadIPWhitelist();
-          } catch (error) {
-            alert('刪除失敗：' + error.message);
-          }
-        }
-      });
-    });
-  });
+  } catch (error) {
+    console.error('載入 IP 白名單失敗:', error);
+    ipList.innerHTML = `<li class="text-red-600">載入失敗: ${error.message}</li>`;
+  }
 }
 
-// 切換顯示模式
-export function toggleDisplayMode(mode) {
-  displayMode = mode;
-  // 重新載入當前頁面的記錄
-  loadCheckinRecords(nameFilterValue, locationFilterValue);
-  
-  // 更新按鈕狀態
-  document.getElementById('original-mode-btn').classList.toggle('bg-indigo-600', mode === 'original');
-  document.getElementById('original-mode-btn').classList.toggle('bg-gray-400', mode !== 'original');
-  document.getElementById('paired-mode-btn').classList.toggle('bg-indigo-600', mode === 'paired');
-  document.getElementById('paired-mode-btn').classList.toggle('bg-gray-400', mode !== 'paired');
-}
+export async function loadCheckinRecords(name = '', location = '', direction = '') {
+  const checkinRecords = document.getElementById('checkin-records');
+  const recordStart = document.getElementById('record-start');
+  const recordEnd = document.getElementById('record-end');
+  const recordTotal = document.getElementById('record-total');
+  const prevPageBtn = document.getElementById('prev-page');
+  const nextPageBtn = document.getElementById('next-page');
 
-// 載入打卡紀錄
-export async function loadCheckinRecords(name = '', location = '', pageDirection = 'first') {
+  checkinRecords.innerHTML = '';
+  currentNameFilter = name;
+  currentLocationFilter = location;
+
   try {
-    nameFilterValue = name;
-    locationFilterValue = location;
-    const recordsTable = document.getElementById('checkin-records');
-    recordsTable.innerHTML = '<tr><td colspan="4" class="py-4 text-center">載入中...</td></tr>';
-    
-    // 建立查詢條件
-    let checkinsRef = collection(window.db, 'checkins');
-    let constraints = [];
-    
-    // 加入排序條件（依時間戳倒序）
-    constraints.push(orderBy('timestamp', 'desc'));
-    
-    // 加入篩選條件 - 注意：如果同時使用 where 和 orderBy，需要在 Firebase 控制台建立複合索引
+    let q = query(collection(window.db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
+
+    // 應用篩選條件
     if (name) {
-      // 如果需要篩選姓名，建議先建立索引
-      constraints.unshift(where('name', '==', name));
+      q = query(q, where('name', '==', name));
     }
-    
-    if (location && location !== '') {
-      constraints.unshift(where('location', '==', location));
+    if (location) {
+      q = query(q, where('location', '==', location));
     }
-    
-    // 分頁控制
-    if (pageDirection === 'next' && lastVisible) {
-      constraints.push(startAfter(lastVisible));
-      currentPage++;
-    } else if (pageDirection === 'prev' && firstVisible && currentPage > 1) {
-      // 回到第一頁
-      currentPage--;
-      if (currentPage === 1) {
-        lastVisible = null;
-        firstVisible = null;
-      } else {
-        // 簡化處理：重新從頭開始查詢到前一頁
-        // 注意：這種方法在大量數據時效率不高，但實現簡單
-        lastVisible = null;
-        firstVisible = null;
-        let tempQuery = query(checkinsRef, ...constraints);
-        let tempSnapshot = await getDocs(tempQuery);
-        let pages = Math.ceil(tempSnapshot.size / pageSize);
-        currentPage = Math.min(currentPage, pages);
-      }
+
+    // 分頁處理
+    if (direction === 'next' && lastDoc) {
+      q = query(q, startAfter(lastDoc));
+    } else if (direction === 'prev' && firstDoc) {
+      q = query(q, startAfter(firstDoc));
+    }
+
+    const querySnapshot = await getDocs(q);
+    const records = [];
+    querySnapshot.forEach((doc) => {
+      records.push({ id: doc.id, ...doc.data() });
+    });
+
+    // 更新分頁狀態
+    if (records.length > 0) {
+      lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      firstDoc = querySnapshot.docs[0];
     } else {
-      // 第一頁或重新查詢
-      currentPage = 1;
-      lastVisible = null;
-      firstVisible = null;
+      lastDoc = null;
+      firstDoc = null;
     }
-    
-    // 限制每頁記錄數
-    constraints.push(limit(pageSize));
-    
-    // 執行查詢
-    const q = query(checkinsRef, ...constraints);
-    const snapshot = await getDocs(q);
-    
-    // 更新分頁控制變數
-    if (!snapshot.empty) {
-      lastVisible = snapshot.docs[snapshot.docs.length - 1];
-      firstVisible = snapshot.docs[0];
-    }
-    
-    // 獲取總記錄數（簡化版）
-    // 注意：在實際應用中，應該使用更高效的方法來計算總記錄數
-    let countQuery;
-    let countConstraints = [];
-    
-    if (name) {
-      countConstraints.push(where('name', '==', name));
-    }
-    
-    if (location && location !== '') {
-      countConstraints.push(where('location', '==', location));
-    }
-    
-    countQuery = query(checkinsRef, ...countConstraints);
-    const countSnapshot = await getDocs(countQuery);
-    totalRecords = countSnapshot.size;
-    
-    // 清空表格
-    recordsTable.innerHTML = '';
-    
-    // 處理查詢結果
-    if (snapshot.empty) {
-      recordsTable.innerHTML = '<tr><td colspan="4" class="py-4 text-center">沒有找到符合條件的記錄</td></tr>';
-      document.getElementById('record-start').textContent = '0';
-      document.getElementById('record-end').textContent = '0';
-    } else {
-      // 將查詢結果轉換為陣列
-      currentRecords = [];
-      snapshot.forEach(doc => {
-        currentRecords.push({
-          id: doc.id,
-          ...doc.data()
-        });
+
+    // 總記錄數（近似估計，可能需要額外查詢）
+    const totalQuery = query(collection(window.db, 'checkins'));
+    const totalSnapshot = await getDocs(totalQuery);
+    const totalRecords = totalSnapshot.size;
+
+    // 顯示記錄
+    if (displayMode === 'original') {
+      records.forEach(record => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="py-3 px-4 border-b">${record.name}</td>
+          <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${record.type === 'checkin' ? record.timestamp + '<br>' + record.device : '-'}</td>
+          <td class="py-3 px-4 border-b">${record.type === 'checkout' ? record.timestamp + '<br>' + record.device : '-'}</td>
+        `;
+        checkinRecords.appendChild(row);
       });
-      
-      if (displayMode === 'paired') {
-        // 配對模式：將上班和下班記錄配對
-        const pairedRecords = pairCheckinRecords(currentRecords);
-        renderPairedRecords(pairedRecords, recordsTable);
-      } else {
-        // 原始模式：顯示每一筆原始記錄
-        renderOriginalRecords(currentRecords, recordsTable);
-      }
-      
-      // 更新分頁信息
-      const start = (currentPage - 1) * pageSize + 1;
-      const end = Math.min(start + snapshot.size - 1, totalRecords);
-      document.getElementById('record-start').textContent = start;
-      document.getElementById('record-end').textContent = end;
+    } else {
+      // 配對模式邏輯
+      const pairedRecords = pairCheckinRecords(records);
+      pairedRecords.forEach(record => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="py-3 px-4 border-b">${record.name}</td>
+          <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${record.checkin ? record.checkin.timestamp + '<br>' + record.checkin.device : '-'}</td>
+          <td class="py-3 px-4 border-b">${record.checkout ? record.checkout.timestamp + '<br>' + record.checkout.device : '-'}</td>
+        `;
+        checkinRecords.appendChild(row);
+      });
     }
-    
-    // 更新總記錄數
-    document.getElementById('record-total').textContent = totalRecords;
-    
-    // 更新分頁按鈕狀態
-    document.getElementById('prev-page').disabled = currentPage === 1;
-    document.getElementById('next-page').disabled = currentPage * pageSize >= totalRecords;
-    
+
+    // 更新分頁資訊
+    recordStart.textContent = records.length > 0 ? (direction === 'prev' ? totalRecords - records.length + 1 : 1) : 0;
+    recordEnd.textContent = records.length;
+    recordTotal.textContent = totalRecords;
+
+    // 控制分頁按鈕
+    prevPageBtn.disabled = !firstDoc;
+    nextPageBtn.disabled = !lastDoc || records.length < 20;
+
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
-    const recordsTable = document.getElementById('checkin-records');
-    recordsTable.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-600">載入失敗: ${error.message}</td></tr>`;
-    
-    // 如果是索引錯誤，提示用戶建立索引
-    if (error.message && error.message.includes('requires an index')) {
-      const indexUrl = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]+/);
-      if (indexUrl) {
-        recordsTable.innerHTML += `
-          <tr><td colspan="4" class="py-2 text-center">
-            <p>需要建立 Firestore 索引，請點擊下方連結：</p>
-            <a href="${indexUrl[0]}" target="_blank" class="text-blue-600 hover:underline">建立索引</a>
-            <p class="mt-2 text-sm">建立索引後，請重新整理頁面</p>
-          </td></tr>
-        `;
-      }
+    if (error.code === 'permission-denied') {
+      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: 權限不足，請以管理員身份登入</td></tr>`;
+    } else {
+      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.message}</td></tr>`;
     }
   }
 }
 
-// 渲染原始記錄（每一筆打卡記錄顯示一行）
-function renderOriginalRecords(records, tableElement) {
-  records.forEach(record => {
-    const row = document.createElement('tr');
-    row.className = 'border-b hover:bg-gray-50';
-    
-    // 姓名
-    const nameCell = document.createElement('td');
-    nameCell.className = 'py-3 px-4';
-    nameCell.textContent = record.name;
-    row.appendChild(nameCell);
-    
-    // 地點
-    const locationCell = document.createElement('td');
-    locationCell.className = 'py-3 px-4';
-    locationCell.textContent = record.location;
-    row.appendChild(locationCell);
-    
-    // 打卡時間/設備
-    const timeCell = document.createElement('td');
-    timeCell.className = 'py-3 px-4';
-    timeCell.colSpan = record.type === 'checkin' ? 1 : 2;
-    timeCell.innerHTML = `
-      <div>${record.timestamp}</div>
-      <div class="text-xs text-gray-500">${record.device}</div>
-    `;
-    row.appendChild(timeCell);
-    
-    // 如果是上班打卡，則下班時間為空
-    if (record.type === 'checkin') {
-      const emptyCell = document.createElement('td');
-      emptyCell.className = 'py-3 px-4';
-      emptyCell.textContent = '-';
-      row.appendChild(emptyCell);
-    }
-    
-    tableElement.appendChild(row);
-  });
-}
-
-// 渲染配對記錄（將上班和下班記錄配對顯示）
-function renderPairedRecords(pairedRecords, tableElement) {
-  pairedRecords.forEach(record => {
-    const row = document.createElement('tr');
-    row.className = 'border-b hover:bg-gray-50';
-    
-    // 姓名
-    const nameCell = document.createElement('td');
-    nameCell.className = 'py-3 px-4';
-    nameCell.textContent = record.name;
-    row.appendChild(nameCell);
-    
-    // 地點
-    const locationCell = document.createElement('td');
-    locationCell.className = 'py-3 px-4';
-    locationCell.textContent = record.location;
-    row.appendChild(locationCell);
-    
-    // 上班時間/設備
-    const checkinCell = document.createElement('td');
-    checkinCell.className = 'py-3 px-4';
-    if (record.checkin) {
-      checkinCell.innerHTML = `
-        <div>${record.checkin.timestamp}</div>
-        <div class="text-xs text-gray-500">${record.checkin.device}</div>
-      `;
-    } else {
-      checkinCell.textContent = '-';
-    }
-    row.appendChild(checkinCell);
-    
-    // 下班時間/設備
-    const checkoutCell = document.createElement('td');
-    checkoutCell.className = 'py-3 px-4';
-    if (record.checkout) {
-      checkoutCell.innerHTML = `
-        <div>${record.checkout.timestamp}</div>
-        <div class="text-xs text-gray-500">${record.checkout.device}</div>
-      `;
-    } else {
-      checkoutCell.textContent = '-';
-    }
-    row.appendChild(checkoutCell);
-    
-    tableElement.appendChild(row);
-  });
-}
-
-// 將上班和下班記錄配對
 function pairCheckinRecords(records) {
-  // 按姓名和日期分組
-  const recordsByNameAndDate = {};
-  
+  const paired = {};
   records.forEach(record => {
-    // 從時間戳中提取日期部分（假設格式為 "YYYY/MM/DD HH:MM:SS" 或類似格式）
-    const datePart = record.timestamp.split(' ')[0];
-    const key = `${record.name}-${datePart}`;
-    
-    if (!recordsByNameAndDate[key]) {
-      recordsByNameAndDate[key] = {
-        name: record.name,
-        location: record.location,
-        date: datePart,
-        checkin: null,
-        checkout: null
-      };
+    const key = `${record.name}_${record.location}_${new Date(record.timestamp).toLocaleDateString('zh-TW')}`;
+    if (!paired[key]) {
+      paired[key] = { name: record.name, location: record.location };
     }
-    
-    // 根據打卡類型更新記錄
     if (record.type === 'checkin') {
-      recordsByNameAndDate[key].checkin = {
-        timestamp: record.timestamp,
-        device: record.device,
-        ip: record.ip
-      };
+      paired[key].checkin = record;
     } else if (record.type === 'checkout') {
-      recordsByNameAndDate[key].checkout = {
-        timestamp: record.timestamp,
-        device: record.device,
-        ip: record.ip
-      };
+      paired[key].checkout = record;
     }
   });
-  
-  // 將分組後的記錄轉換為陣列
-  return Object.values(recordsByNameAndDate);
+  return Object.values(paired);
+}
+
+export function toggleDisplayMode(mode) {
+  displayMode = mode;
+  loadCheckinRecords(currentNameFilter, currentLocationFilter);
 }
