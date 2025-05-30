@@ -10,6 +10,7 @@ let pageSize = 20;
 let currentRecords = [];
 let nameFilterValue = '';
 let locationFilterValue = '';
+let displayMode = 'original'; // 'original' 或 'paired'
 
 // 載入 IP 白名單
 export function loadIPWhitelist() {
@@ -68,6 +69,19 @@ export function loadIPWhitelist() {
   });
 }
 
+// 切換顯示模式
+export function toggleDisplayMode(mode) {
+  displayMode = mode;
+  // 重新載入當前頁面的記錄
+  loadCheckinRecords(nameFilterValue, locationFilterValue);
+  
+  // 更新按鈕狀態
+  document.getElementById('original-mode-btn').classList.toggle('bg-indigo-600', mode === 'original');
+  document.getElementById('original-mode-btn').classList.toggle('bg-gray-400', mode !== 'original');
+  document.getElementById('paired-mode-btn').classList.toggle('bg-indigo-600', mode === 'paired');
+  document.getElementById('paired-mode-btn').classList.toggle('bg-gray-400', mode !== 'paired');
+}
+
 // 載入打卡紀錄
 export async function loadCheckinRecords(name = '', location = '', pageDirection = 'first') {
   try {
@@ -87,6 +101,10 @@ export async function loadCheckinRecords(name = '', location = '', pageDirection
     if (name) {
       // 如果需要篩選姓名，建議先建立索引
       constraints.unshift(where('name', '==', name));
+    }
+    
+    if (location && location !== '') {
+      constraints.unshift(where('location', '==', location));
     }
     
     // 分頁控制
@@ -132,11 +150,17 @@ export async function loadCheckinRecords(name = '', location = '', pageDirection
     // 獲取總記錄數（簡化版）
     // 注意：在實際應用中，應該使用更高效的方法來計算總記錄數
     let countQuery;
+    let countConstraints = [];
+    
     if (name) {
-      countQuery = query(checkinsRef, where('name', '==', name));
-    } else {
-      countQuery = query(checkinsRef);
+      countConstraints.push(where('name', '==', name));
     }
+    
+    if (location && location !== '') {
+      countConstraints.push(where('location', '==', location));
+    }
+    
+    countQuery = query(checkinsRef, ...countConstraints);
     const countSnapshot = await getDocs(countQuery);
     totalRecords = countSnapshot.size;
     
@@ -158,54 +182,14 @@ export async function loadCheckinRecords(name = '', location = '', pageDirection
         });
       });
       
-      // 處理打卡記錄配對（將上班和下班記錄配對）
-      const pairedRecords = pairCheckinRecords(currentRecords);
-      
-      // 渲染記錄
-      pairedRecords.forEach(record => {
-        const row = document.createElement('tr');
-        row.className = 'border-b hover:bg-gray-50';
-        
-        // 姓名
-        const nameCell = document.createElement('td');
-        nameCell.className = 'py-3 px-4';
-        nameCell.textContent = record.name;
-        row.appendChild(nameCell);
-        
-        // 地點
-        const locationCell = document.createElement('td');
-        locationCell.className = 'py-3 px-4';
-        locationCell.textContent = record.location;
-        row.appendChild(locationCell);
-        
-        // 上班時間/設備
-        const checkinCell = document.createElement('td');
-        checkinCell.className = 'py-3 px-4';
-        if (record.checkin) {
-          checkinCell.innerHTML = `
-            <div>${record.checkin.timestamp}</div>
-            <div class="text-xs text-gray-500">${record.checkin.device}</div>
-          `;
-        } else {
-          checkinCell.textContent = '-';
-        }
-        row.appendChild(checkinCell);
-        
-        // 下班時間/設備
-        const checkoutCell = document.createElement('td');
-        checkoutCell.className = 'py-3 px-4';
-        if (record.checkout) {
-          checkoutCell.innerHTML = `
-            <div>${record.checkout.timestamp}</div>
-            <div class="text-xs text-gray-500">${record.checkout.device}</div>
-          `;
-        } else {
-          checkoutCell.textContent = '-';
-        }
-        row.appendChild(checkoutCell);
-        
-        recordsTable.appendChild(row);
-      });
+      if (displayMode === 'paired') {
+        // 配對模式：將上班和下班記錄配對
+        const pairedRecords = pairCheckinRecords(currentRecords);
+        renderPairedRecords(pairedRecords, recordsTable);
+      } else {
+        // 原始模式：顯示每一筆原始記錄
+        renderOriginalRecords(currentRecords, recordsTable);
+      }
       
       // 更新分頁信息
       const start = (currentPage - 1) * pageSize + 1;
@@ -240,6 +224,94 @@ export async function loadCheckinRecords(name = '', location = '', pageDirection
       }
     }
   }
+}
+
+// 渲染原始記錄（每一筆打卡記錄顯示一行）
+function renderOriginalRecords(records, tableElement) {
+  records.forEach(record => {
+    const row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+    
+    // 姓名
+    const nameCell = document.createElement('td');
+    nameCell.className = 'py-3 px-4';
+    nameCell.textContent = record.name;
+    row.appendChild(nameCell);
+    
+    // 地點
+    const locationCell = document.createElement('td');
+    locationCell.className = 'py-3 px-4';
+    locationCell.textContent = record.location;
+    row.appendChild(locationCell);
+    
+    // 打卡時間/設備
+    const timeCell = document.createElement('td');
+    timeCell.className = 'py-3 px-4';
+    timeCell.colSpan = record.type === 'checkin' ? 1 : 2;
+    timeCell.innerHTML = `
+      <div>${record.timestamp}</div>
+      <div class="text-xs text-gray-500">${record.device}</div>
+    `;
+    row.appendChild(timeCell);
+    
+    // 如果是上班打卡，則下班時間為空
+    if (record.type === 'checkin') {
+      const emptyCell = document.createElement('td');
+      emptyCell.className = 'py-3 px-4';
+      emptyCell.textContent = '-';
+      row.appendChild(emptyCell);
+    }
+    
+    tableElement.appendChild(row);
+  });
+}
+
+// 渲染配對記錄（將上班和下班記錄配對顯示）
+function renderPairedRecords(pairedRecords, tableElement) {
+  pairedRecords.forEach(record => {
+    const row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+    
+    // 姓名
+    const nameCell = document.createElement('td');
+    nameCell.className = 'py-3 px-4';
+    nameCell.textContent = record.name;
+    row.appendChild(nameCell);
+    
+    // 地點
+    const locationCell = document.createElement('td');
+    locationCell.className = 'py-3 px-4';
+    locationCell.textContent = record.location;
+    row.appendChild(locationCell);
+    
+    // 上班時間/設備
+    const checkinCell = document.createElement('td');
+    checkinCell.className = 'py-3 px-4';
+    if (record.checkin) {
+      checkinCell.innerHTML = `
+        <div>${record.checkin.timestamp}</div>
+        <div class="text-xs text-gray-500">${record.checkin.device}</div>
+      `;
+    } else {
+      checkinCell.textContent = '-';
+    }
+    row.appendChild(checkinCell);
+    
+    // 下班時間/設備
+    const checkoutCell = document.createElement('td');
+    checkoutCell.className = 'py-3 px-4';
+    if (record.checkout) {
+      checkoutCell.innerHTML = `
+        <div>${record.checkout.timestamp}</div>
+        <div class="text-xs text-gray-500">${record.checkout.device}</div>
+      `;
+    } else {
+      checkoutCell.textContent = '-';
+    }
+    row.appendChild(checkoutCell);
+    
+    tableElement.appendChild(row);
+  });
 }
 
 // 將上班和下班記錄配對
