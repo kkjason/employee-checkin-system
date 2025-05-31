@@ -16,11 +16,11 @@ export async function loadIPWhitelist() {
       const li = document.createElement('li');
       li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
       li.innerHTML = `
-        <span>${ip}</span>
-        <button class="text-blue-600 hover:text-blue-800 edit-ip-btn" data-id="${doc.id}" data-ip="${ip}">編輯</button>
-        <button class="text-red-600 hover:text-red-800 delete-ip-btn" data-id="${doc.id}">
-          刪除
-        </button>
+        <span class="flex-1">${ip}</span>
+        <div class="flex space-x-2">
+          <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg">編輯</button>
+          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg">刪除</button>
+        </div>
       `;
       ipList.appendChild(li);
     });
@@ -28,7 +28,7 @@ export async function loadIPWhitelist() {
     // 綁定刪除按鈕事件
     document.querySelectorAll('.delete-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
+        const id = btn.closest('li').dataset.id;
         try {
           await deleteDoc(doc(window.db, 'whitelist', id));
           loadIPWhitelist();
@@ -42,8 +42,8 @@ export async function loadIPWhitelist() {
     // 綁定編輯按鈕事件
     document.querySelectorAll('.edit-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        const newIp = prompt("請輸入新的 IP 位址:", btn.dataset.ip);
+        const id = btn.closest('li').dataset.id;
+        const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
         if (newIp) {
           try {
             await updateDoc(doc(window.db, 'whitelist', id), { ip: newIp });
@@ -119,11 +119,12 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     if (displayMode === 'original') {
       records.forEach(record => {
         const row = document.createElement('tr');
+        const checkinTime = new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
           <td class="py-3 px-4 border-b">${record.location}</td>
-          <td class="py-3 px-4 border-b">${record.type === 'checkin' ? record.timestamp + '<br>' + record.device : '-'}</td>
-          <td class="py-3 px-4 border-b">${record.type === 'checkout' ? record.timestamp + '<br>' + record.device : '-'}</td>
+          <td class="py-3 px-4 border-b">${record.type === 'checkin' ? `${checkinTime}<br>${record.device}` : '-'}</td>
+          <td class="py-3 px-4 border-b">${record.type === 'checkout' ? `${checkinTime}<br>${record.device}` : '-'}</td>
         `;
         checkinRecords.appendChild(row);
       });
@@ -131,12 +132,16 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       // 配對模式邏輯
       const pairedRecords = pairCheckinRecords(records);
       pairedRecords.forEach(record => {
+        const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-';
+        const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-';
+        const checkinDevice = record.checkin ? record.checkin.device : '-';
+        const checkoutDevice = record.checkout ? record.checkout.device : '-';
         const row = document.createElement('tr');
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
           <td class="py-3 px-4 border-b">${record.location}</td>
-          <td class="py-3 px-4 border-b">${record.checkin ? record.checkin.timestamp + '<br>' + record.checkin.device : '-'}</td>
-          <td class="py-3 px-4 border-b">${record.checkout ? record.checkout.timestamp + '<br>' + record.checkout.device : '-'}</td>
+          <td class="py-3 px-4 border-b">${checkinTime}<br>${checkinDevice}</td>
+          <td class="py-3 px-4 border-b">${checkoutTime}<br>${checkoutDevice}</td>
         `;
         checkinRecords.appendChild(row);
       });
