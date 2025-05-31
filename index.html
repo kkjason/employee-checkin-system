@@ -257,9 +257,9 @@
         const isWhitelisted = await isIPWhitelisted(userIP);
         if (!isWhitelisted) {
           showAlert({
-            zh: `IP ${userIP} 未在白名單，請連接餐廳WIFI`,
-            vi: `IP ${userIP} không có trong danh sách trắng, vui lòng kết nối WIFI nhà hàng`,
-            en: `IP ${userIP} is not whitelisted, please connect to restaurant WIFI`
+            zh: t.wifiError,
+            vi: getTranslations('vi').wifiError,
+            en: getTranslations('en').wifiError
           });
           return;
         }
@@ -325,9 +325,9 @@
         const isWhitelisted = await isIPWhitelisted(userIP);
         if (!isWhitelisted) {
           showAlert({
-            zh: `IP ${userIP} 未在白名單，請連接餐廳WIFI`,
-            vi: `IP ${userIP} không có trong danh sách trắng, vui lòng kết nối WIFI nhà hàng`,
-            en: `IP ${userIP} is not whitelisted, please connect to restaurant WIFI`
+            zh: t.wifiError,
+            vi: getTranslations('vi').wifiError,
+            en: getTranslations('en').wifiError
           });
           return;
         }
