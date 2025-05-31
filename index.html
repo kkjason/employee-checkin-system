@@ -5,6 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>員工打卡系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 400px;
+      text-align: center;
+    }
+    .modal button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background-color: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .modal button:hover {
+      background-color: #4338ca;
+    }
+  </style>
 </head>
 <body class="bg-gradient-to-r from-blue-100 to-indigo-100 min-h-screen p-4">
   <div class="container mx-auto">
@@ -32,8 +65,13 @@
           <button id="logout-btn" class="w-full bg-gray-600 text-white p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200 mt-4">登出</button>
         </div>
       </div>
-      <div class="mt-4 text-center">
-        <a href="/admin.html" class="text-indigo-600 hover:underline">前往管理頁面</a>
+    </div>
+
+    <!-- 提示對話框 -->
+    <div id="alert-modal" class="modal">
+      <div class="modal-content">
+        <p id="alert-message"></p>
+        <button id="alert-close">確定</button>
       </div>
     </div>
   </div>
@@ -67,6 +105,24 @@
     const checkinBtn = document.getElementById('checkin-btn');
     const checkoutBtn = document.getElementById('checkout-btn');
     const logoutBtn = document.getElementById('logout-btn');
+    const alertModal = document.getElementById('alert-modal');
+    const alertMessage = document.getElementById('alert-message');
+    const alertClose = document.getElementById('alert-close');
+
+    // 顯示多語言提示
+    function showAlert(messages) {
+      alertMessage.innerHTML = `
+        <p>${messages.zh}</p>
+        <p>${messages.vi}</p>
+        <p>${messages.en}</p>
+      `;
+      alertModal.style.display = 'flex';
+    }
+
+    // 關閉提示
+    alertClose.addEventListener('click', () => {
+      alertModal.style.display = 'none';
+    });
 
     // 獲取用戶 IP
     async function getUserIP() {
@@ -113,7 +169,8 @@
           }
           loginContainer.classList.remove('hidden');
           checkinContainer.classList.add('hidden');
-          showLoginForm(auth);
+          const lang = localStorage.getItem('language') || 'zh';
+          showLoginForm(auth, lang);
         }
       });
 
@@ -125,18 +182,30 @@
         const userIP = await getUserIP();
 
         if (!name || !location) {
-          alert('請輸入姓名和地點');
+          showAlert({
+            zh: '請輸入姓名和地點',
+            vi: 'Vui lòng nhập tên và địa điểm',
+            en: 'Please enter your name and location'
+          });
           return;
         }
 
         if (!userIP) {
-          alert('無法獲取您的 IP 地址，請檢查網絡');
+          showAlert({
+            zh: '無法獲取您的 IP 地址，請檢查網絡',
+            vi: 'Không thể lấy địa chỉ IP của bạn, vui lòng kiểm tra mạng',
+            en: 'Unable to retrieve your IP address, please check your network'
+          });
           return;
         }
 
         const isWhitelisted = await isIPWhitelisted(userIP);
         if (!isWhitelisted) {
-          alert('您的 IP 地址不在白名單中，無法打卡');
+          showAlert({
+            zh: '請連接餐廳WIFI',
+            vi: 'Vui lòng kết nối với WIFI của nhà hàng',
+            en: 'Please connect to the restaurant WIFI'
+          });
           return;
         }
 
@@ -150,10 +219,18 @@
             userId: auth.currentUser.uid,
             ip: userIP
           });
-          alert('上班打卡成功');
+          showAlert({
+            zh: '上班打卡成功',
+            vi: 'Điểm danh bắt đầu ca làm việc thành công',
+            en: 'Check-in successful'
+          });
         } catch (error) {
           console.error('打卡失敗:', error);
-          alert('打卡失敗: ' + error.message);
+          showAlert({
+            zh: `打卡失敗: ${error.message}`,
+            vi: `Điểm danh thất bại: ${error.message}`,
+            en: `Check-in failed: ${error.message}`
+          });
         }
       });
 
@@ -165,18 +242,30 @@
         const userIP = await getUserIP();
 
         if (!name || !location) {
-          alert('請輸入姓名和地點');
+          showAlert({
+            zh: '請輸入姓名和地點',
+            vi: 'Vui lòng nhập tên và địa điểm',
+            en: 'Please enter your name and location'
+          });
           return;
         }
 
         if (!userIP) {
-          alert('無法獲取您的 IP 地址，請檢查網絡');
+          showAlert({
+            zh: '無法獲取您的 IP 地址，請檢查網絡',
+            vi: 'Không thể lấy địa chỉ IP của bạn, vui lòng kiểm tra mạng',
+            en: 'Unable to retrieve your IP address, please check your network'
+          });
           return;
         }
 
         const isWhitelisted = await isIPWhitelisted(userIP);
         if (!isWhitelisted) {
-          alert('您的 IP 地址不在白名單中，無法打卡');
+          showAlert({
+            zh: '請連接餐廳WIFI',
+            vi: 'Vui lòng kết nối với WIFI của nhà hàng',
+            en: 'Please connect to the restaurant WIFI'
+          });
           return;
         }
 
@@ -190,10 +279,18 @@
             userId: auth.currentUser.uid,
             ip: userIP
           });
-          alert('下班打卡成功');
+          showAlert({
+            zh: '下班打卡成功',
+            vi: 'Điểm danh kết thúc ca làm việc thành công',
+            en: 'Check-out successful'
+          });
         } catch (error) {
           console.error('打卡失敗:', error);
-          alert('打卡失敗: ' + error.message);
+          showAlert({
+            zh: `打卡失敗: ${error.message}`,
+            vi: `Điểm danh thất bại: ${error.message}`,
+            en: `Check-out failed: ${error.message}`
+          });
         }
       });
 
@@ -203,7 +300,11 @@
           console.log('登出成功');
           window.location.reload();
         }).catch((error) => {
-          alert('登出失敗: ' + error.message);
+          showAlert({
+            zh: `登出失敗: ${error.message}`,
+            vi: `Đăng xuất thất bại: ${error.message}`,
+            en: `Logout failed: ${error.message}`
+          });
         });
       });
     });
