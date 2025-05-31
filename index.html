@@ -6,53 +6,44 @@
   <title>員工打卡系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gradient-to-r from-blue-100 to-indigo-100 flex items-center justify-center min-h-screen">
-  <!-- 登入容器 -->
-  <div id="login-container" class="w-full max-w-lg p-4">
-    <!-- 登入內容將由 JavaScript 動態生成 -->
-  </div>
+<body class="bg-gradient-to-r from-blue-100 to-indigo-100 min-h-screen p-4">
+  <div class="container mx-auto">
+    <!-- 登入容器 -->
+    <div id="login-container"></div>
 
-  <!-- 打卡容器 -->
-  <div id="app" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transform transition-all duration-300 hidden">
-    <div class="flex justify-between items-center mb-6">
-      <div class="flex gap-4">
-        <button id="lang-zh" class="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors duration-200" data-lang="zh">中文</button>
-        <button id="lang-vi" class="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors duration-200" data-lang="vi">Tiếng Việt</button>
-        <button id="lang-en" class="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors duration-200" data-lang="en">English</button>
-      </div>
-      <button id="logout-btn" class="text-gray-500 hover:text-gray-700">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-        </svg>
-      </button>
-    </div>
-    <h1 id="title" class="text-3xl font-bold text-indigo-700 mb-6 text-center">員工打卡系統</h1>
-    <div id="user-info" class="mb-4 p-3 bg-gray-50 rounded-lg">
-      <div class="flex items-center">
-        <img id="user-avatar" src="" alt="User" class="w-10 h-10 rounded-full mr-3">
-        <div>
-          <div id="user-name-display" class="font-medium"></div>
-          <div id="user-email" class="text-sm text-gray-500"></div>
+    <!-- 打卡頁面容器 -->
+    <div id="checkin-container" class="hidden">
+      <h1 class="text-3xl font-bold text-indigo-700 mb-6 text-center">員工打卡系統</h1>
+      <div class="bg-white p-6 rounded-xl shadow-lg max-w-md mx-auto">
+        <h2 class="text-2xl font-bold text-indigo-700 mb-4">打卡</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-gray-700 mb-1">姓名</label>
+            <input id="name-input" type="text" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="請輸入您的姓名">
+          </div>
+          <div>
+            <label class="block text-gray-700 mb-1">地點</label>
+            <select id="location-input" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+              <option value="宏匯">宏匯</option>
+            </select>
+          </div>
+          <button id="checkin-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">上班打卡</button>
+          <button id="checkout-btn" class="w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition-colors duration-200">下班打卡</button>
+          <button id="logout-btn" class="w-full bg-gray-600 text-white p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200 mt-4">登出</button>
         </div>
       </div>
-    </div>
-    <div id="checkin-section" class="space-y-4">
-      <input id="name" type="text" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200" placeholder="輸入姓名" disabled>
-      <select id="location" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200">
-        <option value="宏匯">宏匯</option>
-      </select>
-      <button id="checkin-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">上班打卡</button>
-      <button id="checkout-btn" class="w-full bg-orange-600 text-white p-3 rounded-lg hover:bg-orange-700 transition-colors duration-200">下班打卡</button>
-      <div id="checkin-status" class="mt-4 text-center font-medium hidden"></div>
+      <div class="mt-4 text-center">
+        <a href="/admin.html" class="text-indigo-600 hover:underline">前往管理頁面</a>
+      </div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-    import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-    import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-    import { getUserIPs, getDeviceInfo, getIPWhitelist, handleCheckin } from '/js/functions.js';
-    import { initializeAuthFlow } from '/js/device_binding_flow.js';
+    import { getFirestore, collection, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+    import { showLoginForm } from '/js/device_binding_flow.js';
+    import { generateDeviceFingerprint } from '/js/device_binding_flow.js';
 
     // Firebase 配置
     const firebaseConfig = {
@@ -68,184 +59,104 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
-    window.db = db; // 將 db 暴露給 functions.js 使用
 
     // DOM 元素
-    const nameInput = document.getElementById('name');
-    const locationSelect = document.getElementById('location');
+    const loginContainer = document.getElementById('login-container');
+    const checkinContainer = document.getElementById('checkin-container');
+    const nameInput = document.getElementById('name-input');
+    const locationInput = document.getElementById('location-input');
     const checkinBtn = document.getElementById('checkin-btn');
     const checkoutBtn = document.getElementById('checkout-btn');
-    const checkinStatus = document.getElementById('checkin-status');
-    const langButtons = document.querySelectorAll('[data-lang]');
     const logoutBtn = document.getElementById('logout-btn');
-    const appContainer = document.getElementById('app');
 
-    // 語言切換
-    const translations = {
-      zh: {
-        title: '員工打卡系統',
-        name: '輸入姓名',
-        location: '宏匯',
-        checkin: '上班打卡',
-        checkout: '下班打卡',
-        success: '打卡成功！',
-        fail: '打卡失敗：',
-        ipError: '您的 IP 不在白名單內，無法打卡！',
-        inputError: '請輸入姓名和選擇地點！',
-        noCheckinRecord: '找不到今天的上班打卡記錄，是否忘記上班打卡？',
-        confirmCheckout: '確認直接下班打卡',
-        cancelCheckout: '取消',
-        notLoggedIn: '您尚未登入，請先登入再進行打卡',
-        deviceNotBound: '此裝置未綁定您的帳號，請先完成綁定'
-      },
-      vi: {
-        title: 'Hệ thống chấm công nhân viên',
-        name: 'Nhập tên',
-        location: '宏匯',
-        checkin: 'Chấm công vào',
-        checkout: 'Chấm công ra',
-        success: 'Chấm công thành công!',
-        fail: 'Chấm công thất bại:',
-        ipError: 'IP của bạn không nằm trong danh sách trắng, không thể chấm công!',
-        inputError: 'Vui lòng nhập tên và chọn địa điểm!',
-        noCheckinRecord: 'Không tìm thấy bản ghi chấm công vào hôm nay, bạn có quên chấm công vào không?',
-        confirmCheckout: 'Xác nhận chấm công ra',
-        cancelCheckout: 'Hủy',
-        notLoggedIn: 'Bạn chưa đăng nhập, vui lòng đăng nhập trước khi chấm công',
-        deviceNotBound: 'Thiết bị này chưa được liên kết với tài khoản của bạn, vui lòng hoàn tất liên kết'
-      },
-      en: {
-        title: 'Employee Check-in System',
-        name: 'Enter name',
-        location: '宏匯',
-        checkin: 'Check-in',
-        checkout: 'Check-out',
-        success: 'Check-in successful!',
-        fail: 'Check-in failed:',
-        ipError: 'Your IP is not in the whitelist, cannot check-in!',
-        inputError: 'Please enter name and select location!',
-        noCheckinRecord: 'No check-in record found for today, did you forget to check in?',
-        confirmCheckout: 'Confirm check-out',
-        cancelCheckout: 'Cancel',
-        notLoggedIn: 'You are not logged in, please login first before checking in',
-        deviceNotBound: 'This device is not bound to your account, please complete the binding first'
-      }
-    };
-
-    let currentLang = 'zh';
-
-    function setLanguage(lang) {
-      currentLang = lang;
-      document.getElementById('title').textContent = translations[lang].title;
-      nameInput.placeholder = translations[lang].name;
-      locationSelect.options[0].text = translations[lang].location;
-      document.getElementById('checkin-btn').textContent = translations[lang].checkin;
-      document.getElementById('checkout-btn').textContent = translations[lang].checkout;
-      checkinStatus.classList.add('hidden');
-    }
-
-    langButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        setLanguage(button.dataset.lang);
-      });
-    });
-
-    // 登出按鈕
-    logoutBtn.addEventListener('click', () => {
-      signOut(auth).then(() => {
-        window.location.reload();
-      }).catch((error) => {
-        console.error('登出失敗:', error);
-      });
-    });
-
-    // 預設語言為中文
-    setLanguage('zh');
-
-    // 上班/下班打卡
-checkinBtn.addEventListener('click', async () => {
-  const user = auth.currentUser;
-  if (!user) {
-    checkinStatus.textContent = translations[currentLang].notLoggedIn;
-    checkinStatus.classList.remove('hidden', 'text-green-600');
-    checkinStatus.classList.add('text-red-600');
-    return;
-  }
-
-  const deviceFingerprint = await generateDeviceFingerprint();
-  const bindingStatus = await checkUserDeviceBinding(user.uid, deviceFingerprint);
-  
-  if (!bindingStatus.bound) {
-    checkinStatus.textContent = bindingStatus.reason === 'permission_denied' 
-      ? translations[currentLang].permissionError 
-      : translations[currentLang].deviceNotBound;
-    checkinStatus.classList.remove('hidden', 'text-green-600');
-    checkinStatus.classList.add('text-red-600');
-    return;
-  }
-
-  await handleCheckin('checkin', nameInput.value, locationSelect.value, currentLang, checkinStatus);
-});
-
-    checkoutBtn.addEventListener('click', async () => {
-      // 檢查用戶是否已登入
-      const user = auth.currentUser;
-      if (!user) {
-        checkinStatus.textContent = translations[currentLang].notLoggedIn;
-        checkinStatus.classList.remove('hidden', 'text-green-600');
-        checkinStatus.classList.add('text-red-600');
-        return;
-      }
-
-      // 檢查裝置是否已綁定
-      const deviceFingerprint = await generateDeviceFingerprint();
-      const bindingStatus = await checkUserDeviceBinding(user.uid, deviceFingerprint);
-      
-      if (!bindingStatus.bound) {
-        checkinStatus.textContent = translations[currentLang].deviceNotBound;
-        checkinStatus.classList.remove('hidden', 'text-green-600');
-        checkinStatus.classList.add('text-red-600');
-        return;
-      }
-
-      await handleCheckin('checkout', nameInput.value, locationSelect.value, currentLang, checkinStatus);
-    });
-
-    // 初始化身份驗證流程
+    // 等待 DOM 載入完成
     document.addEventListener('DOMContentLoaded', () => {
-      initializeAuthFlow();
-      
-      // 監聽身份驗證狀態變化
-      auth.onAuthStateChanged((user) => {
+      // 身份驗證狀態監聽
+      onAuthStateChanged(auth, async (user) => {
         if (user) {
-          // 用戶已登入，更新用戶資訊顯示
-          document.getElementById('user-name-display').textContent = user.displayName || '未設定姓名';
-          document.getElementById('user-email').textContent = user.email;
-          document.getElementById('user-avatar').src = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || 'User');
-          
-          // 顯示打卡介面
-          appContainer.classList.remove('hidden');
+          console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
+          if (!loginContainer || !checkinContainer) {
+            console.error('找不到 loginContainer 或 checkinContainer');
+            return;
+          }
+          loginContainer.classList.add('hidden');
+          checkinContainer.classList.remove('hidden');
         } else {
-          // 用戶未登入，隱藏打卡介面
-          appContainer.classList.add('hidden');
+          console.log('無用戶登入');
+          if (!loginContainer || !checkinContainer) {
+            console.error('找不到 loginContainer 或 checkinContainer');
+            return;
+          }
+          loginContainer.classList.remove('hidden');
+          checkinContainer.classList.add('hidden');
+          showLoginForm(auth);
         }
       });
+
+      // 上班打卡
+      checkinBtn.addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        const location = locationInput.value;
+        const deviceFingerprint = await generateDeviceFingerprint();
+        
+        if (!name || !location) {
+          alert('請輸入姓名和地點');
+          return;
+        }
+
+        try {
+          await addDoc(collection(db, 'checkins'), {
+            name,
+            location,
+            type: 'checkin',
+            timestamp: new Date().toISOString(),
+            device: deviceFingerprint,
+            userId: auth.currentUser.uid
+          });
+          alert('上班打卡成功');
+        } catch (error) {
+          console.error('打卡失敗:', error);
+          alert('打卡失敗: ' + error.message);
+        }
+      });
+
+      // 下班打卡
+      checkoutBtn.addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        const location = locationInput.value;
+        const deviceFingerprint = await generateDeviceFingerprint();
+        
+        if (!name || !location) {
+          alert('請輸入姓名和地點');
+          return;
+        }
+
+        try {
+          await addDoc(collection(db, 'checkins'), {
+            name,
+            location,
+            type: 'checkout',
+            timestamp: new Date().toISOString(),
+            device: deviceFingerprint,
+            userId: auth.currentUser.uid
+          });
+          alert('下班打卡成功');
+        } catch (error) {
+          console.error('打卡失敗:', error);
+          alert('打卡失敗: ' + error.message);
+        }
+      });
+
+      // 登出
+      logoutBtn.addEventListener('click', () => {
+        signOut(auth).then(() => {
+          console.log('登出成功');
+          window.location.reload();
+        }).catch((error) => {
+          alert('登出失敗: ' + error.message);
+        });
+      });
     });
-
-    // 從 device_binding_flow.js 導入的函數
-    async function generateDeviceFingerprint() {
-      // 這個函數實際上會在 device_binding_flow.js 中定義
-      // 這裡只是為了讓代碼能夠運行而添加的佔位符
-      return window.generateDeviceFingerprint ? window.generateDeviceFingerprint() : 'placeholder';
-    }
-
-    async function checkUserDeviceBinding(userId, deviceFingerprint) {
-      // 這個函數實際上會在 device_binding_flow.js 中定義
-      // 這裡只是為了讓代碼能夠運行而添加的佔位符
-      return window.checkUserDeviceBinding ? 
-        window.checkUserDeviceBinding(userId, deviceFingerprint) : 
-        { bound: true, userData: { displayName: 'Test User' } };
-    }
   </script>
 </body>
 </html>
