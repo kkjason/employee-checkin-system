@@ -17,30 +17,32 @@ const translations = {
     registerTitle: '註冊新帳號',
     registerSubmit: '提交註冊',
     backToLogin: '返回登入',
-    emptyFields: '請輸入電子郵件和密碼',
+    emptyFields: '請輸入電子郵件、密碼和姓名',
     emptyEmail: '請輸入電子郵件',
     loginFailed: '登入失敗',
     passwordResetSent: '密碼重設郵件已發送',
     passwordResetFailed: '密碼重設失敗',
     registerFailed: '註冊失敗',
     registerSuccess: '註冊成功，請登入',
+    // 註冊姓名欄位
+    nameLabel: '姓名',
+    namePlaceholder: '請輸入您的姓名',
     // 打卡畫面
     checkinTitle: '員工打卡系統',
     checkinHeader: '打卡',
-    nameLabel: '姓名',
-    namePlaceholder: '請輸入您的姓名',
     locationLabel: '地點',
     locationOption: '宏匯',
     checkinBtn: '上班打卡',
     checkoutBtn: '下班打卡',
     logoutBtn: '登出',
-    emptyFields: '請輸入姓名和地點',
+    emptyLocation: '請選擇地點',
     ipError: '無法獲取您的 IP 地址，請檢查網絡',
     wifiError: '請連接餐廳WIFI',
     checkinSuccess: '上班打卡成功',
     checkoutSuccess: '下班打卡成功',
     checkinFailed: '打卡失敗',
-    logoutFailed: '登出失敗'
+    logoutFailed: '登出失敗',
+    nameNotFound: '未找到註冊姓名，請聯繫管理員'
   },
   vi: {
     // 登入畫面
@@ -56,30 +58,32 @@ const translations = {
     registerTitle: 'Đăng ký tài khoản mới',
     registerSubmit: 'Gửi đăng ký',
     backToLogin: 'Quay lại đăng nhập',
-    emptyFields: 'Vui lòng nhập email và mật khẩu',
+    emptyFields: 'Vui lòng nhập email, mật khẩu và tên',
     emptyEmail: 'Vui lòng nhập email',
     loginFailed: 'Đăng nhập thất bại',
     passwordResetSent: 'Email đặt lại mật khẩu đã được gửi',
     passwordResetFailed: 'Đặt lại mật khẩu thất bại',
     registerFailed: 'Đăng ký thất bại',
     registerSuccess: 'Đăng ký thành công, vui lòng đăng nhập',
+    // 註冊姓名欄位
+    nameLabel: 'Tên',
+    namePlaceholder: 'Vui lòng nhập tên của bạn',
     // 打卡畫面
     checkinTitle: 'Hệ thống chấm công nhân viên',
     checkinHeader: 'Chấm công',
-    nameLabel: 'Tên',
-    namePlaceholder: 'Vui lòng nhập tên của bạn',
     locationLabel: 'Địa điểm',
     locationOption: 'Hong Hui',
     checkinBtn: 'Chấm công bắt đầu',
     checkoutBtn: 'Chấm công kết thúc',
     logoutBtn: 'Đăng xuất',
-    emptyFields: 'Vui lòng nhập tên và địa điểm',
+    emptyLocation: 'Vui lòng chọn địa điểm',
     ipError: 'Không thể lấy địa chỉ IP của bạn, vui lòng kiểm tra mạng',
     wifiError: 'Vui lòng kết nối với WIFI của nhà hàng',
     checkinSuccess: 'Chấm công bắt đầu thành công',
     checkoutSuccess: 'Chấm công kết thúc thành công',
     checkinFailed: 'Chấm công thất bại',
-    logoutFailed: 'Đăng xuất thất bại'
+    logoutFailed: 'Đăng xuất thất bại',
+    nameNotFound: 'Không tìm thấy tên đã đăng ký, vui lòng liên hệ quản trị viên'
   },
   en: {
     // 登入畫面
@@ -95,36 +99,52 @@ const translations = {
     registerTitle: 'Register New Account',
     registerSubmit: 'Submit Registration',
     backToLogin: 'Back to Login',
-    emptyFields: 'Please enter email and password',
+    emptyFields: 'Please enter email, password, and name',
     emptyEmail: 'Please enter email',
     loginFailed: 'Login failed',
     passwordResetSent: 'Password reset email sent',
     passwordResetFailed: 'Password reset failed',
     registerFailed: 'Registration failed',
     registerSuccess: 'Registration successful, please login',
+    // 註冊姓名欄位
+    nameLabel: 'Name',
+    namePlaceholder: 'Please enter your name',
     // 打卡畫面
     checkinTitle: 'Employee Check-in System',
     checkinHeader: 'Check-in',
-    nameLabel: 'Name',
-    namePlaceholder: 'Please enter your name',
     locationLabel: 'Location',
     locationOption: 'Hong Hui',
     checkinBtn: 'Check-in',
     checkoutBtn: 'Check-out',
     logoutBtn: 'Logout',
-    emptyFields: 'Please enter name and location',
+    emptyLocation: 'Please select a location',
     ipError: 'Unable to retrieve your IP address, please check your network',
     wifiError: 'Please connect to the restaurant WIFI',
     checkinSuccess: 'Check-in successful',
     checkoutSuccess: 'Check-out successful',
     checkinFailed: 'Check-in failed',
-    logoutFailed: 'Logout failed'
+    logoutFailed: 'Logout failed',
+    nameNotFound: 'Registered name not found, please contact the administrator'
   }
 };
 
 // 導出翻譯函數
 export function getTranslations(lang) {
   return translations[lang] || translations.zh;
+}
+
+// 獲取用戶姓名
+export async function getUserName(db, userId) {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      return userDoc.data().name;
+    }
+    return null;
+  } catch (error) {
+    console.error('獲取用戶姓名失敗:', error);
+    return null;
+  }
 }
 
 export async function showLoginForm(auth, lang = 'zh') {
@@ -239,7 +259,7 @@ export async function showLoginForm(auth, lang = 'zh') {
   });
 }
 
-function showRegisterForm(auth, lang = 'zh') {
+export async function showRegisterForm(auth, db, lang = 'zh') {
   const loginContainer = document.getElementById('login-container');
   const t = translations[lang];
 
@@ -257,13 +277,16 @@ function showRegisterForm(auth, lang = 'zh') {
           <input type="email" id="register-email" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.emailPlaceholder}">
         </div>
         <div>
-          <label class="block text-gray-700 mb-1">${t.password}</label>
+          <label class="block text-gray-700 mb-1">${t.passwordLabel}</label>
           <input type="password" id="register-password" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.passwordPlaceholder}">
         </div>
-        <button id="register-submit" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">${t.registerSubmit}</button>
+        <div>
+          <label class="block text-gray-700 mb-1">${t.nameLabel}</label>
+          <input type="text" id="register-name" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.namePlaceholder}">
+        </div>
+        <button id="register-submit-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">${t.registerSubmit}</button>
         <div class="text-center">
           <button id="back-to-login-btn" class="text-indigo-600 hover:underline">${t.backToLogin}</button>
-          <input type="text" id="passwordInput" placeholder="Enter password">
         </div>
       </div>
     </div>
@@ -274,15 +297,16 @@ function showRegisterForm(auth, lang = 'zh') {
     btn.addEventListener('click', () => {
       const newLang = btn.dataset.lang;
       localStorage.setItem('language', newLang);
-      showRegisterForm(auth, newLang);
+      showRegisterForm(auth, db, newLang);
     });
   });
 
-  document.getElementById('register-submit').addEventListener('click', async () => {
+  document.getElementById('register-submit-btn').addEventListener('click', async () => {
     const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
+    const name = document.getElementById('register-name').value.trim();
 
-    if (!email || !password) {
+    if (!email || !password || !name) {
       showAlert({
         zh: t.emptyFields,
         vi: translations.vi.emptyFields,
@@ -292,7 +316,9 @@ function showRegisterForm(auth, lang = 'zh') {
     }
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userId = userCredential.user.uid;
+      await setDoc(doc(db, 'users', userId), { name });
       showAlert({
         zh: t.registerSuccess,
         vi: translations.vi.registerSuccess,
@@ -314,8 +340,8 @@ function showRegisterForm(auth, lang = 'zh') {
   });
 }
 
-function showForgotPassword() {
-  console.log('顯示密码');
+function showForgotPasswordForm(auth) {
+  console.log('顯示忘記密碼表單');
 }
 
 export async function generateDeviceFingerprint() {
@@ -334,7 +360,7 @@ function showAlert(messages) {
   const alertModal = document.getElementById('alert-modal');
   const alertMessage = document.getElementById('alert-message');
   if (!alertModal || !alertMessage) {
-    console.error('找不到 alert 或 alert-message');
+    console.error('找不到 alert-modal 或 alert-message');
     return;
   }
   alertMessage.innerHTML = `
@@ -344,3 +370,4 @@ function showAlert(messages) {
   `;
   alertModal.style.display = 'flex';
 }
+```
