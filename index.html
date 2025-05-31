@@ -60,7 +60,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
     import { getFirestore, collection, addDoc, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-    import { showLoginForm, generateDeviceFingerprint, getTranslations } from '/js/device_binding_flow.js';
+    import { showLoginForm, generateDeviceFingerprint, getTranslations, getUserName } from '/js/device_binding_flow.js';
 
     // Firebase 配置
     const firebaseConfig = {
@@ -138,10 +138,6 @@
           <h2 class="text-2xl font-bold text-indigo-700 mb-4">${t.checkinHeader}</h2>
           <div class="space-y-4">
             <div>
-              <label class="block text-gray-700 mb-1">${t.nameLabel}</label>
-              <input id="name-input" type="text" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.namePlaceholder}">
-            </div>
-            <div>
               <label class="block text-gray-700 mb-1">${t.locationLabel}</label>
               <select id="location-input" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                 <option value="宏匯">${t.locationOption}</option>
@@ -164,23 +160,31 @@
       });
 
       // 綁定按鈕事件
-      const nameInput = document.getElementById('name-input');
       const locationInput = document.getElementById('location-input');
       const checkinBtn = document.getElementById('checkin-btn');
       const checkoutBtn = document.getElementById('checkout-btn');
       const logoutBtn = document.getElementById('logout-btn');
 
       checkinBtn.addEventListener('click', async () => {
-        const name = nameInput.value.trim();
         const location = locationInput.value;
         const deviceFingerprint = await generateDeviceFingerprint();
         const userIP = await getUserIP();
+        const name = await getUserName(db, auth.currentUser.uid);
 
-        if (!name || !location) {
+        if (!location) {
           showAlert({
-            zh: t.emptyFields,
-            vi: getTranslations('vi').emptyFields,
-            en: getTranslations('en').emptyFields
+            zh: t.emptyLocation,
+            vi: getTranslations('vi').emptyLocation,
+            en: getTranslations('en').emptyLocation
+          });
+          return;
+        }
+
+        if (!name) {
+          showAlert({
+            zh: t.nameNotFound,
+            vi: getTranslations('vi').nameNotFound,
+            en: getTranslations('en').nameNotFound
           });
           return;
         }
@@ -230,16 +234,25 @@
       });
 
       checkoutBtn.addEventListener('click', async () => {
-        const name = nameInput.value.trim();
         const location = locationInput.value;
         const deviceFingerprint = await generateDeviceFingerprint();
         const userIP = await getUserIP();
+        const name = await getUserName(db, auth.currentUser.uid);
 
-        if (!name || !location) {
+        if (!location) {
           showAlert({
-            zh: t.emptyFields,
-            vi: getTranslations('vi').emptyFields,
-            en: getTranslations('en').emptyFields
+            zh: t.emptyLocation,
+            vi: getTranslations('vi').emptyLocation,
+            en: getTranslations('en').emptyLocation
+          });
+          return;
+        }
+
+        if (!name) {
+          showAlert({
+            zh: t.nameNotFound,
+            vi: getTranslations('vi').nameNotFound,
+            en: getTranslations('en').nameNotFound
           });
           return;
         }
