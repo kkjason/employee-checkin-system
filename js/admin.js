@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, addDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 // Firebase 配置
@@ -29,6 +29,7 @@ const ipManagement = document.getElementById('ip-management');
 const checkinManagement = document.getElementById('checkin-management');
 const ipManagementBtn = document.getElementById('ip-management-btn');
 const checkinManagementBtn = document.getElementById('checkin-management-btn');
+const logoutBtn = document.getElementById('logout-btn'); // 獲取登出按鈕
 
 // 按鈕事件綁定
 ipManagementBtn.addEventListener('click', () => {
@@ -58,6 +59,18 @@ document.addEventListener('DOMContentLoaded', () => {
       window.location.href = '/index.html'; // 導向登入頁面
     }
   });
+});
+
+// 登出按鈕事件
+logoutBtn.addEventListener('click', async () => {
+  try {
+    await signOut(auth);
+    console.log('登出成功');
+    window.location.href = '/index.html'; // 登出後導向登入頁面
+  } catch (error) {
+    console.error('登出失敗:', error);
+    alert('登出失敗: ' + error.message);
+  }
 });
 
 export async function loadIPWhitelist() {
