@@ -337,8 +337,14 @@ export function showForgotPasswordForm(auth) {
 
 export async function generateDeviceFingerprint() {
   // 獲取使用者的設備信息
-  const userAgent = navigator.userAgent;
-  return userAgent; // 返回 userAgent 作為設備指紋
+  const parser = new UAParser();
+  const result = parser.getResult();
+  
+  // 獲取設備信息
+  const deviceInfo = `${result.device.vendor || 'Unknown'} ${result.device.model || 'Unknown'}`;
+  const osInfo = `${result.os.name || 'Unknown'} ${result.os.version || 'Unknown'}`;
+  
+  return `${deviceInfo} (${osInfo})`; // 返回設備和操作系統信息
 }
 
 export async function checkUserDeviceBinding(userId, deviceFingerprint) {
