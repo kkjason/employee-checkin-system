@@ -138,7 +138,7 @@ export async function getUserName(db, userId) {
   }
 }
 
-export async function showLoginForm(auth, lang = 'zh') {
+export async function showLoginForm(auth, db, lang = 'zh') {
   const loginContainer = document.getElementById('login-container');
   if (!loginContainer) {
     console.error('找不到 login-container 元素');
@@ -181,7 +181,7 @@ export async function showLoginForm(auth, lang = 'zh') {
     btn.addEventListener('click', () => {
       const newLang = btn.dataset.lang;
       localStorage.setItem('language', newLang);
-      showLoginForm(auth, newLang);
+      showLoginForm(auth, db, newLang);
     });
   });
 
@@ -315,7 +315,7 @@ export async function showRegisterForm(auth, db, lang = 'zh') {
         vi: translations.vi.registerSuccess,
         en: translations.en.registerSuccess
       });
-      showLoginForm(auth, lang);
+      showLoginForm(auth, db, lang);
     } catch (error) {
       console.error('註冊失敗:', error);
       showAlert({
@@ -327,7 +327,7 @@ export async function showRegisterForm(auth, db, lang = 'zh') {
   });
 
   document.getElementById('back-to-login-btn').addEventListener('click', () => {
-    showLoginForm(auth, lang);
+    showLoginForm(auth, db, lang);
   });
 }
 
