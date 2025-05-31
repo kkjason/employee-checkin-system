@@ -7,6 +7,25 @@ let currentNameFilter = '';
 let currentLocationFilter = '';
 let currentPage = 0; // 當前頁碼
 
+// DOM 元素
+const ipManagement = document.getElementById('ip-management');
+const checkinManagement = document.getElementById('checkin-management');
+const ipManagementBtn = document.getElementById('ip-management-btn');
+const checkinManagementBtn = document.getElementById('checkin-management-btn');
+
+// 按鈕事件綁定
+ipManagementBtn.addEventListener('click', () => {
+  ipManagement.classList.remove('hidden');
+  checkinManagement.classList.add('hidden');
+  loadIPWhitelist(); // 載入 IP 白名單
+});
+
+checkinManagementBtn.addEventListener('click', () => {
+  checkinManagement.classList.remove('hidden');
+  ipManagement.classList.add('hidden');
+  loadCheckinRecords(); // 載入打卡紀錄
+});
+
 export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
   ipList.innerHTML = '';
@@ -198,4 +217,3 @@ export function toggleDisplayMode(mode) {
   displayMode = mode;
   loadCheckinRecords(currentNameFilter, currentLocationFilter);
 }
- 
