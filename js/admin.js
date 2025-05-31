@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, addDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -14,7 +14,8 @@ const firebaseConfig = {
 
 // 初始化 Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app); // 確保在初始化後獲取 auth 實例
+const db = getFirestore(app); // 確保 Firestore 正確初始化
+const auth = getAuth(app); // 確保 Auth 正確初始化
 
 let lastDoc = null;
 let firstDoc = null;
@@ -63,7 +64,7 @@ export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
   ipList.innerHTML = '';
   try {
-    const querySnapshot = await getDocs(collection(window.db, 'whitelist'));
+    const querySnapshot = await getDocs(collection(db, 'whitelist')); // 使用正確的 db
     querySnapshot.forEach((doc) => {
       const ip = doc.data().ip;
       const li = document.createElement('li');
@@ -83,7 +84,7 @@ export async function loadIPWhitelist() {
       btn.addEventListener('click', async () => {
         const id = btn.closest('li').dataset.id;
         try {
-          await deleteDoc(doc(window.db, 'whitelist', id));
+          await deleteDoc(doc(db, 'whitelist', id)); // 使用正確的 db
           loadIPWhitelist();
         } catch (error) {
           console.error('刪除 IP 失敗:', error);
@@ -99,7 +100,7 @@ export async function loadIPWhitelist() {
         const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
         if (newIp) {
           try {
-            await updateDoc(doc(window.db, 'whitelist', id), { ip: newIp });
+            await updateDoc(doc(db, 'whitelist', id), { ip: newIp }); // 使用正確的 db
             loadIPWhitelist();
           } catch (error) {
             console.error('更新 IP 失敗:', error);
@@ -131,7 +132,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   currentLocationFilter = location;
 
   try {
-    let q = query(collection(window.db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
+    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
 
     // 應用篩選條件
     if (name) {
@@ -153,7 +154,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         currentPage = 0;
       }
       if (currentPage === 0) {
-        q = query(collection(window.db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
+        q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
       } else {
         q = query(q, startAfter(firstDoc));
       }
@@ -175,7 +176,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     }
 
     // 總記錄數（近似估計，可能需要額外查詢）
-    const totalQuery = query(collection(window.db, 'checkins'));
+    const totalQuery = query(collection(db, 'checkins'));
     const totalSnapshot = await getDocs(totalQuery);
     const totalRecords = totalSnapshot.size;
 
