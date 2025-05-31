@@ -223,7 +223,7 @@
 
       checkinBtn.addEventListener('click', async () => {
         const location = locationInput.value;
-        const deviceFingerprint = await generateDeviceFingerprint();
+        const deviceFingerprint = await generateDeviceFingerprint(); // 獲取設備信息
         const userIP = await getUserIP();
         const name = nameInput.value;
 
@@ -270,7 +270,7 @@
             location,
             type: 'checkin',
             timestamp: new Date().toISOString(),
-            device: deviceFingerprint,
+            device: deviceFingerprint, // 使用設備信息
             userId: auth.currentUser.uid,
             ip: userIP
           });
@@ -291,7 +291,7 @@
 
       checkoutBtn.addEventListener('click', async () => {
         const location = locationInput.value;
-        const deviceFingerprint = await generateDeviceFingerprint();
+        const deviceFingerprint = await generateDeviceFingerprint(); // 獲取設備信息
         const userIP = await getUserIP();
         const name = nameInput.value;
 
@@ -338,7 +338,7 @@
             location,
             type: 'checkout',
             timestamp: new Date().toISOString(),
-            device: deviceFingerprint,
+            device: deviceFingerprint, // 使用設備信息
             userId: auth.currentUser.uid,
             ip: userIP
           });
