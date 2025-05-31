@@ -198,3 +198,4 @@ export function toggleDisplayMode(mode) {
   displayMode = mode;
   loadCheckinRecords(currentNameFilter, currentLocationFilter);
 }
+ 
