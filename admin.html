@@ -132,27 +132,44 @@
     const logoutBtn = document.getElementById('logout-btn');
 
     // 管理員 UID 清單
-    const ADMIN_UIDS = ['YOUR_ADMIN_UID']; // 替換為實際管理員 UID
+    const ADMIN_UIDS = ['YOUR_ADMIN_UID']; // 替換為實際管理員 UID，例如 'aBcDeFg123456789'
 
     // 等待 DOM 載入完成
     document.addEventListener('DOMContentLoaded', () => {
       // 身份驗證狀態監聽
       onAuthStateChanged(auth, (user) => {
         if (user) {
-          console.log('用戶 UID:', user.uid, '電子郵件:', user.email); // 調試日誌
+          console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
+          console.log('是否為管理員:', ADMIN_UIDS.includes(user.uid));
+        } else {
+          console.log('無用戶登入');
         }
+
         if (user && ADMIN_UIDS.includes(user.uid)) {
-          // 用戶是管理員，顯示管理介面
+          console.log('顯示管理介面');
+          if (!loginContainer || !adminContainer) {
+            console.error('找不到 loginContainer 或 adminContainer');
+            return;
+          }
           loginContainer.classList.add('hidden');
           adminContainer.classList.remove('hidden');
           // 初始載入
-          loadIPWhitelist();
-          loadCheckinRecords();
+          try {
+            loadIPWhitelist();
+            loadCheckinRecords();
+          } catch (error) {
+            console.error('載入數據失敗:', error);
+            alert('載入數據失敗: ' + error.message);
+          }
         } else {
-          // 非管理員或未登入，顯示登入表單
+          console.log('顯示登入表單');
+          if (!loginContainer || !adminContainer) {
+            console.error('找不到 loginContainer 或 adminContainer');
+            return;
+          }
           loginContainer.classList.remove('hidden');
           adminContainer.classList.add('hidden');
-          showLoginForm(auth); // 傳遞 auth 實例
+          showLoginForm(auth);
         }
       });
 
@@ -208,6 +225,7 @@
       // 登出按鈕
       logoutBtn.addEventListener('click', () => {
         signOut(auth).then(() => {
+          console.log('登出成功');
           window.location.reload();
         }).catch((error) => {
           alert('登出失敗：' + error.message);
