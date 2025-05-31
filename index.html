@@ -163,29 +163,29 @@
     setLanguage('zh');
 
     // 上班/下班打卡
-    checkinBtn.addEventListener('click', async () => {
-      // 檢查用戶是否已登入
-      const user = auth.currentUser;
-      if (!user) {
-        checkinStatus.textContent = translations[currentLang].notLoggedIn;
-        checkinStatus.classList.remove('hidden', 'text-green-600');
-        checkinStatus.classList.add('text-red-600');
-        return;
-      }
+checkinBtn.addEventListener('click', async () => {
+  const user = auth.currentUser;
+  if (!user) {
+    checkinStatus.textContent = translations[currentLang].notLoggedIn;
+    checkinStatus.classList.remove('hidden', 'text-green-600');
+    checkinStatus.classList.add('text-red-600');
+    return;
+  }
 
-      // 檢查裝置是否已綁定
-      const deviceFingerprint = await generateDeviceFingerprint();
-      const bindingStatus = await checkUserDeviceBinding(user.uid, deviceFingerprint);
-      
-      if (!bindingStatus.bound) {
-        checkinStatus.textContent = translations[currentLang].deviceNotBound;
-        checkinStatus.classList.remove('hidden', 'text-green-600');
-        checkinStatus.classList.add('text-red-600');
-        return;
-      }
+  const deviceFingerprint = await generateDeviceFingerprint();
+  const bindingStatus = await checkUserDeviceBinding(user.uid, deviceFingerprint);
+  
+  if (!bindingStatus.bound) {
+    checkinStatus.textContent = bindingStatus.reason === 'permission_denied' 
+      ? translations[currentLang].permissionError 
+      : translations[currentLang].deviceNotBound;
+    checkinStatus.classList.remove('hidden', 'text-green-600');
+    checkinStatus.classList.add('text-red-600');
+    return;
+  }
 
-      await handleCheckin('checkin', nameInput.value, locationSelect.value, currentLang, checkinStatus);
-    });
+  await handleCheckin('checkin', nameInput.value, locationSelect.value, currentLang, checkinStatus);
+});
 
     checkoutBtn.addEventListener('click', async () => {
       // 檢查用戶是否已登入
