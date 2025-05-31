@@ -41,7 +41,11 @@ export async function loadIPWhitelist() {
     });
   } catch (error) {
     console.error('載入 IP 白名單失敗:', error);
-    ipList.innerHTML = `<li class="text-red-600">載入失敗: ${error.message}</li>`;
+    if (error.code === 'permission-denied') {
+      ipList.innerHTML = `<li class="text-red-600">載入失敗: 權限不足，請確認您是管理員</li>`;
+    } else {
+      ipList.innerHTML = `<li class="text-red-600">載入失敗: ${error.message}</li>`;
+    }
   }
 }
 
@@ -134,7 +138,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
     if (error.code === 'permission-denied') {
-      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: 權限不足，請以管理員身份登入</td></tr>`;
+      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: 權限不足，請確認您是管理員</td></tr>`;
     } else {
       checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.message}</td></tr>`;
     }
