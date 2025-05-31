@@ -130,6 +130,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 顯示記錄
     if (displayMode === 'original') {
       records.forEach(record => {
+        const row = document.createElement('tr'); // 確保在這裡創建 row
         const checkinTime = new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
@@ -147,7 +148,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-';
         const checkinDevice = record.checkin ? record.checkin.device : '-';
         const checkoutDevice = record.checkout ? record.checkout.device : '-';
-        const row = document.createElement('tr');
+        const row = document.createElement('tr'); // 確保在這裡創建 row
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
           <td class="py-3 px-4 border-b">${record.location}</td>
