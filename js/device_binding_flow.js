@@ -10,7 +10,7 @@ export async function showLoginForm(auth) {
 
   loginContainer.innerHTML = `
     <div class="bg-white p-6 rounded-xl shadow-lg max-w-md mx-auto">
-      <h2 class="text-2xl font-bold text-indigo-700 mb-4">管理員登入</h2>
+      <h2 class="text-2xl font-bold text-indigo-700 mb-4">員工打卡系統登入</h2>
       <div class="space-y-4">
         <div>
           <label class="block text-gray-700 mb-1">電子郵件</label>
