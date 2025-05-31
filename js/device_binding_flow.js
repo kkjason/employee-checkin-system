@@ -316,12 +316,11 @@ function showLoginForm() {
     }
   });
   
-  // 綁定註冊按鈕事件
+  // 其他事件綁定（忘記密碼、註冊）
   document.getElementById('register-btn').addEventListener('click', () => {
     showRegisterForm();
   });
   
-  // 綁定忘記密碼按鈕事件
   document.getElementById('forgot-password-btn').addEventListener('click', () => {
     showForgotPasswordForm();
   });
