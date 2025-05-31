@@ -4,7 +4,6 @@ import { collection, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebas
 // 多語言翻譯
 const translations = {
   zh: {
-    // 登入畫面
     title: '員工打卡系統登入',
     emailLabel: '電子郵件',
     emailPlaceholder: '請輸入您的電子郵件',
@@ -24,10 +23,8 @@ const translations = {
     passwordResetFailed: '密碼重設失敗',
     registerFailed: '註冊失敗',
     registerSuccess: '註冊成功，請登入',
-    // 註冊姓名欄位
     nameLabel: '姓名',
     namePlaceholder: '請輸入您的姓名',
-    // 打卡畫面
     checkinTitle: '員工打卡系統',
     checkinHeader: '打卡',
     locationLabel: '地點',
@@ -45,7 +42,6 @@ const translations = {
     nameNotFound: '未找到註冊姓名，請聯繫管理員'
   },
   vi: {
-    // 登入畫面
     title: 'Đăng nhập hệ thống chấm công nhân viên',
     emailLabel: 'Email',
     emailPlaceholder: 'Vui lòng nhập email của bạn',
@@ -65,10 +61,8 @@ const translations = {
     passwordResetFailed: 'Đặt lại mật khẩu thất bại',
     registerFailed: 'Đăng ký thất bại',
     registerSuccess: 'Đăng ký thành công, vui lòng đăng nhập',
-    // 註冊姓名欄位
     nameLabel: 'Tên',
     namePlaceholder: 'Vui lòng nhập tên của bạn',
-    // 打卡畫面
     checkinTitle: 'Hệ thống chấm công nhân viên',
     checkinHeader: 'Chấm công',
     locationLabel: 'Địa điểm',
@@ -86,7 +80,6 @@ const translations = {
     nameNotFound: 'Không tìm thấy tên đã đăng ký, vui lòng liên hệ quản trị viên'
   },
   en: {
-    // 登入畫面
     title: 'Employee Check-in System Login',
     emailLabel: 'Email',
     emailPlaceholder: 'Please enter your email',
@@ -106,10 +99,8 @@ const translations = {
     passwordResetFailed: 'Password reset failed',
     registerFailed: 'Registration failed',
     registerSuccess: 'Registration successful, please login',
-    // 註冊姓名欄位
     nameLabel: 'Name',
     namePlaceholder: 'Please enter your name',
-    // 打卡畫面
     checkinTitle: 'Employee Check-in System',
     checkinHeader: 'Check-in',
     locationLabel: 'Location',
@@ -255,7 +246,7 @@ export async function showLoginForm(auth, lang = 'zh') {
   });
 
   document.getElementById('register-btn').addEventListener('click', () => {
-    showRegisterForm(auth, lang);
+    showRegisterForm(auth, db, lang);
   });
 }
 
@@ -340,7 +331,7 @@ export async function showRegisterForm(auth, db, lang = 'zh') {
   });
 }
 
-function showForgotPasswordForm(auth) {
+export function showForgotPasswordForm(auth) {
   console.log('顯示忘記密碼表單');
 }
 
@@ -355,7 +346,6 @@ export async function checkUserDeviceBinding(userId, deviceFingerprint) {
 export function initializeAuthFlow() {
 }
 
-// 提示視窗（與 index.html 共用）
 function showAlert(messages) {
   const alertModal = document.getElementById('alert-modal');
   const alertMessage = document.getElementById('alert-message');
@@ -370,4 +360,3 @@ function showAlert(messages) {
   `;
   alertModal.style.display = 'flex';
 }
-```
