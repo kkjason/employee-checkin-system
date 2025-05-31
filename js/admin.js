@@ -26,6 +26,27 @@ checkinManagementBtn.addEventListener('click', () => {
   loadCheckinRecords(); // 載入打卡紀錄
 });
 
+// 等待 DOM 載入完成
+document.addEventListener('DOMContentLoaded', () => {
+  // 確保 Firebase 已初始化
+  const db = window.db; // 確保 db 已經在全局範圍內可用
+  const auth = window.auth; // 確保 auth 已經在全局範圍內可用
+
+  // 身份驗證狀態監聽
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
+      document.getElementById('admin-container').classList.remove('hidden');
+      ipManagement.classList.remove('hidden'); // 預設顯示 IP 管理
+      checkinManagement.classList.add('hidden');
+      await loadIPWhitelist(); // 載入 IP 白名單
+    } else {
+      console.log('無用戶登入');
+      window.location.href = '/index.html'; // 導向登入頁面
+    }
+  });
+});
+
 export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
   ipList.innerHTML = '';
