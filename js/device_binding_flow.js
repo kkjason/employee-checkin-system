@@ -1,8 +1,6 @@
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { collection, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-// 注意：不再在模組頂層定義 auth，而是通過參數傳遞
-
 export async function showLoginForm(auth) {
   const loginContainer = document.getElementById('login-container');
   if (!loginContainer) {
@@ -10,7 +8,6 @@ export async function showLoginForm(auth) {
     return;
   }
 
-  // 渲染登入表單
   loginContainer.innerHTML = `
     <div class="bg-white p-6 rounded-xl shadow-lg max-w-md mx-auto">
       <h2 class="text-2xl font-bold text-indigo-700 mb-4">管理員登入</h2>
@@ -35,7 +32,6 @@ export async function showLoginForm(auth) {
     </div>
   `;
 
-  // 綁定登入按鈕事件
   const loginBtn = document.getElementById('login-btn');
   if (!loginBtn) {
     console.error('找不到 login-btn 元素');
@@ -43,7 +39,7 @@ export async function showLoginForm(auth) {
   }
 
   loginBtn.addEventListener('click', async () => {
-    console.log('登入按鈕被點擊'); // 調試日誌
+    console.log('登入按鈕被點擊');
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
 
@@ -54,15 +50,13 @@ export async function showLoginForm(auth) {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      console.log('登入成功'); // 調試日誌
-      // onAuthStateChanged 會處理後續頁面切換
+      console.log('登入成功');
     } catch (error) {
       console.error('登入失敗:', error);
       alert(`登入失敗: ${error.message}`);
     }
   });
 
-  // 綁定其他按鈕事件
   document.getElementById('forgot-password-btn').addEventListener('click', () => {
     const email = document.getElementById('login-email').value.trim();
     if (!email) {
@@ -84,7 +78,6 @@ export async function showLoginForm(auth) {
 }
 
 function showRegisterForm(auth) {
-  // 簡單實現註冊表單
   const loginContainer = document.getElementById('login-container');
   loginContainer.innerHTML = `
     <div class="bg-white p-6 rounded-xl shadow-lg max-w-md mx-auto">
@@ -131,7 +124,6 @@ function showRegisterForm(auth) {
 }
 
 function showForgotPasswordForm(auth) {
-  // 簡單實現忘記密碼表單
   console.log('顯示忘記密碼表單');
 }
 
@@ -144,5 +136,4 @@ export async function checkUserDeviceBinding(userId, deviceFingerprint) {
 }
 
 export function initializeAuthFlow() {
-  // 假設已實現
 }
