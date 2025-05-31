@@ -5,6 +5,7 @@ let firstDoc = null;
 let displayMode = 'original';
 let currentNameFilter = '';
 let currentLocationFilter = '';
+let currentPage = 0; // 當前頁碼
 
 export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
@@ -89,10 +90,21 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     }
 
     // 分頁處理
-    if (direction === 'next' && lastDoc) {
-      q = query(q, startAfter(lastDoc));
-    } else if (direction === 'prev' && firstDoc) {
-      q = query(q, startAfter(firstDoc));
+    if (direction === 'next') {
+      currentPage++;
+      if (currentPage > 0) {
+        q = query(q, startAfter(lastDoc));
+      }
+    } else if (direction === 'prev') {
+      currentPage--;
+      if (currentPage < 0) {
+        currentPage = 0;
+      }
+      if (currentPage === 0) {
+        q = query(collection(window.db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
+      } else {
+        q = query(q, startAfter(firstDoc));
+      }
     }
 
     const querySnapshot = await getDocs(q);
@@ -118,7 +130,6 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 顯示記錄
     if (displayMode === 'original') {
       records.forEach(record => {
-        const row = document.createElement('tr');
         const checkinTime = new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
@@ -148,12 +159,12 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     }
 
     // 更新分頁資訊
-    recordStart.textContent = records.length > 0 ? (direction === 'prev' ? totalRecords - records.length + 1 : 1) : 0;
-    recordEnd.textContent = records.length;
+    recordStart.textContent = (currentPage * 20) + 1;
+    recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
     recordTotal.textContent = totalRecords;
 
     // 控制分頁按鈕
-    prevPageBtn.disabled = !firstDoc;
+    prevPageBtn.disabled = currentPage === 0;
     nextPageBtn.disabled = !lastDoc || records.length < 20;
 
   } catch (error) {
