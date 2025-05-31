@@ -152,7 +152,7 @@
           // 非管理員或未登入，顯示登入表單
           loginContainer.classList.remove('hidden');
           adminContainer.classList.add('hidden');
-          showLoginForm();
+          showLoginForm(auth); // 傳遞 auth 實例
         }
       });
 
