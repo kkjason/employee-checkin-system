@@ -37,6 +37,10 @@
     .modal button:hover {
       background-color: #4338ca;
     }
+    input[readonly] {
+      background-color: #f3f4f6;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body class="bg-gradient-to-r from-blue-100 to-indigo-100 min-h-screen p-4">
@@ -125,8 +129,15 @@
     }
 
     // 渲染打卡表單
-    function renderCheckinForm(lang = 'zh') {
+    async function renderCheckinForm(lang = 'zh') {
       const t = getTranslations(lang);
+      // 獲取當前用戶姓名
+      const userId = auth.currentUser?.uid;
+      let name = '';
+      if (userId) {
+        name = await getUserName(db, userId) || '';
+      }
+
       checkinContainer.innerHTML = `
         <div class="flex justify-center mb-4">
           <button class="lang-btn px-4 py-2 mx-1 rounded-lg ${lang === 'zh' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}" data-lang="zh">中文</button>
@@ -137,6 +148,10 @@
         <div class="bg-white p-6 rounded-xl shadow-lg max-w-md mx-auto">
           <h2 class="text-2xl font-bold text-indigo-700 mb-4">${t.checkinHeader}</h2>
           <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 mb-1">${t.nameLabel}</label>
+              <input type="text" id="name-input" value="${name}" readonly class="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed" placeholder="${t.namePlaceholder}">
+            </div>
             <div>
               <label class="block text-gray-700 mb-1">${t.locationLabel}</label>
               <select id="location-input" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
@@ -160,6 +175,7 @@
       });
 
       // 綁定按鈕事件
+      const nameInput = document.getElementById('name-input');
       const locationInput = document.getElementById('location-input');
       const checkinBtn = document.getElementById('checkin-btn');
       const checkoutBtn = document.getElementById('checkout-btn');
@@ -169,7 +185,7 @@
         const location = locationInput.value;
         const deviceFingerprint = await generateDeviceFingerprint();
         const userIP = await getUserIP();
-        const name = await getUserName(db, auth.currentUser.uid);
+        const name = nameInput.value;
 
         if (!location) {
           showAlert({
@@ -237,7 +253,7 @@
         const location = locationInput.value;
         const deviceFingerprint = await generateDeviceFingerprint();
         const userIP = await getUserIP();
-        const name = await getUserName(db, auth.currentUser.uid);
+        const name = nameInput.value;
 
         if (!location) {
           showAlert({
@@ -328,7 +344,7 @@
           }
           loginContainer.classList.add('hidden');
           checkinContainer.classList.remove('hidden');
-          renderCheckinForm(lang);
+          await renderCheckinForm(lang);
         } else {
           console.log('無用戶登入');
           if (!loginContainer || !checkinContainer) {
