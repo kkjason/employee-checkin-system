@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 let lastDoc = null;
 let firstDoc = null;
@@ -17,10 +17,9 @@ export async function loadIPWhitelist() {
       li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
       li.innerHTML = `
         <span>${ip}</span>
+        <button class="text-blue-600 hover:text-blue-800 edit-ip-btn" data-id="${doc.id}" data-ip="${ip}">編輯</button>
         <button class="text-red-600 hover:text-red-800 delete-ip-btn" data-id="${doc.id}">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-          </svg>
+          刪除
         </button>
       `;
       ipList.appendChild(li);
@@ -36,6 +35,23 @@ export async function loadIPWhitelist() {
         } catch (error) {
           console.error('刪除 IP 失敗:', error);
           alert('刪除失敗: ' + error.message);
+        }
+      });
+    });
+
+    // 綁定編輯按鈕事件
+    document.querySelectorAll('.edit-ip-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const newIp = prompt("請輸入新的 IP 位址:", btn.dataset.ip);
+        if (newIp) {
+          try {
+            await updateDoc(doc(window.db, 'whitelist', id), { ip: newIp });
+            loadIPWhitelist();
+          } catch (error) {
+            console.error('更新 IP 失敗:', error);
+            alert('更新失敗: ' + error.message);
+          }
         }
       });
     });
