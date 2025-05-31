@@ -1,4 +1,5 @@
 import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js'; // 確保導入 onAuthStateChanged
 
 let lastDoc = null;
 let firstDoc = null;
@@ -28,9 +29,8 @@ checkinManagementBtn.addEventListener('click', () => {
 
 // 等待 DOM 載入完成
 document.addEventListener('DOMContentLoaded', () => {
-  // 確保 Firebase 已初始化
+  const auth = getAuth(); // 獲取 Firebase Auth 實例
   const db = window.db; // 確保 db 已經在全局範圍內可用
-  const auth = window.auth; // 確保 auth 已經在全局範圍內可用
 
   // 身份驗證狀態監聽
   onAuthStateChanged(auth, async (user) => {
