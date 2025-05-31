@@ -134,78 +134,84 @@
     // 管理員 UID 清單
     const ADMIN_UIDS = ['YOUR_ADMIN_UID']; // 替換為實際管理員 UID
 
-    // 身份驗證狀態監聽
-    onAuthStateChanged(auth, (user) => {
-      if (user && ADMIN_UIDS.includes(user.uid)) {
-        // 用戶是管理員，顯示管理介面
-        loginContainer.classList.add('hidden');
-        adminContainer.classList.remove('hidden');
-        // 初始載入
-        loadIPWhitelist();
-        loadCheckinRecords();
-      } else {
-        // 非管理員或未登入，顯示登入表單
-        loginContainer.classList.remove('hidden');
-        adminContainer.classList.add('hidden');
-        showLoginForm();
-      }
-    });
+    // 等待 DOM 載入完成
+    document.addEventListener('DOMContentLoaded', () => {
+      // 身份驗證狀態監聽
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          console.log('用戶 UID:', user.uid, '電子郵件:', user.email); // 調試日誌
+        }
+        if (user && ADMIN_UIDS.includes(user.uid)) {
+          // 用戶是管理員，顯示管理介面
+          loginContainer.classList.add('hidden');
+          adminContainer.classList.remove('hidden');
+          // 初始載入
+          loadIPWhitelist();
+          loadCheckinRecords();
+        } else {
+          // 非管理員或未登入，顯示登入表單
+          loginContainer.classList.remove('hidden');
+          adminContainer.classList.add('hidden');
+          showLoginForm();
+        }
+      });
 
-    // 新增 IP
-    addIpBtn.addEventListener('click', async () => {
-      const ip = ipInput.value.trim();
-      if (!ip) {
-        alert('請輸入有效的 IP 位址！');
-        return;
-      }
-      try {
-        await addDoc(collection(db, 'whitelist'), { ip: ip });
-        ipInput.value = '';
-        loadIPWhitelist();
-      } catch (error) {
-        alert('新增失敗：' + error.message);
-      }
-    });
+      // 新增 IP
+      addIpBtn.addEventListener('click', async () => {
+        const ip = ipInput.value.trim();
+        if (!ip) {
+          alert('請輸入有效的 IP 位址！');
+          return;
+        }
+        try {
+          await addDoc(collection(db, 'whitelist'), { ip: ip });
+          ipInput.value = '';
+          loadIPWhitelist();
+        } catch (error) {
+          alert('新增失敗：' + error.message);
+        }
+      });
 
-    // 查詢打卡紀錄
-    searchBtn.addEventListener('click', () => {
-      const name = nameFilter.value.trim();
-      const location = locationFilter.value;
-      loadCheckinRecords(name, location);
-    });
+      // 查詢打卡紀錄
+      searchBtn.addEventListener('click', () => {
+        const name = nameFilter.value.trim();
+        const location = locationFilter.value;
+        loadCheckinRecords(name, location);
+      });
 
-    // 分頁控制
-    prevPageBtn.addEventListener('click', () => {
-      loadCheckinRecords(nameFilter.value.trim(), locationFilter.value, 'prev');
-    });
+      // 分頁控制
+      prevPageBtn.addEventListener('click', () => {
+        loadCheckinRecords(nameFilter.value.trim(), locationFilter.value, 'prev');
+      });
 
-    nextPageBtn.addEventListener('click', () => {
-      loadCheckinRecords(nameFilter.value.trim(), locationFilter.value, 'next');
-    });
+      nextPageBtn.addEventListener('click', () => {
+        loadCheckinRecords(nameFilter.value.trim(), locationFilter.value, 'next');
+      });
 
-    // 顯示模式切換
-    originalModeBtn.addEventListener('click', () => {
-      toggleDisplayMode('original');
-      originalModeBtn.classList.add('bg-indigo-600', 'text-white');
-      originalModeBtn.classList.remove('bg-gray-400');
-      pairedModeBtn.classList.add('bg-gray-400');
-      pairedModeBtn.classList.remove('bg-indigo-600', 'text-white');
-    });
+      // 顯示模式切換
+      originalModeBtn.addEventListener('click', () => {
+        toggleDisplayMode('original');
+        originalModeBtn.classList.add('bg-indigo-600', 'text-white');
+        originalModeBtn.classList.remove('bg-gray-400');
+        pairedModeBtn.classList.add('bg-gray-400');
+        pairedModeBtn.classList.remove('bg-indigo-600', 'text-white');
+      });
 
-    pairedModeBtn.addEventListener('click', () => {
-      toggleDisplayMode('paired');
-      pairedModeBtn.classList.add('bg-indigo-600', 'text-white');
-      pairedModeBtn.classList.remove('bg-gray-400');
-      originalModeBtn.classList.add('bg-gray-400');
-      originalModeBtn.classList.remove('bg-indigo-600', 'text-white');
-    });
+      pairedModeBtn.addEventListener('click', () => {
+        toggleDisplayMode('paired');
+        pairedModeBtn.classList.add('bg-indigo-600', 'text-white');
+        pairedModeBtn.classList.remove('bg-gray-400');
+        originalModeBtn.classList.add('bg-gray-400');
+        originalModeBtn.classList.remove('bg-indigo-600', 'text-white');
+      });
 
-    // 登出按鈕
-    logoutBtn.addEventListener('click', () => {
-      signOut(auth).then(() => {
-        window.location.reload();
-      }).catch((error) => {
-        alert('登出失敗：' + error.message);
+      // 登出按鈕
+      logoutBtn.addEventListener('click', () => {
+        signOut(auth).then(() => {
+          window.location.reload();
+        }).catch((error) => {
+          alert('登出失敗：' + error.message);
+        });
       });
     });
   </script>
