@@ -4,6 +4,7 @@ import { collection, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebas
 // 多語言翻譯
 const translations = {
   zh: {
+    // 登入畫面
     title: '員工打卡系統登入',
     emailLabel: '電子郵件',
     emailPlaceholder: '請輸入您的電子郵件',
@@ -22,9 +23,27 @@ const translations = {
     passwordResetSent: '密碼重設郵件已發送',
     passwordResetFailed: '密碼重設失敗',
     registerFailed: '註冊失敗',
-    registerSuccess: '註冊成功，請登入'
+    registerSuccess: '註冊成功，請登入',
+    // 打卡畫面
+    checkinTitle: '員工打卡系統',
+    checkinHeader: '打卡',
+    nameLabel: '姓名',
+    namePlaceholder: '請輸入您的姓名',
+    locationLabel: '地點',
+    locationOption: '宏匯',
+    checkinBtn: '上班打卡',
+    checkoutBtn: '下班打卡',
+    logoutBtn: '登出',
+    emptyFields: '請輸入姓名和地點',
+    ipError: '無法獲取您的 IP 地址，請檢查網絡',
+    wifiError: '請連接餐廳WIFI',
+    checkinSuccess: '上班打卡成功',
+    checkoutSuccess: '下班打卡成功',
+    checkinFailed: '打卡失敗',
+    logoutFailed: '登出失敗'
   },
   vi: {
+    // 登入畫面
     title: 'Đăng nhập hệ thống chấm công nhân viên',
     emailLabel: 'Email',
     emailPlaceholder: 'Vui lòng nhập email của bạn',
@@ -43,9 +62,27 @@ const translations = {
     passwordResetSent: 'Email đặt lại mật khẩu đã được gửi',
     passwordResetFailed: 'Đặt lại mật khẩu thất bại',
     registerFailed: 'Đăng ký thất bại',
-    registerSuccess: 'Đăng ký thành công, vui lòng đăng nhập'
+    registerSuccess: 'Đăng ký thành công, vui lòng đăng nhập',
+    // 打卡畫面
+    checkinTitle: 'Hệ thống chấm công nhân viên',
+    checkinHeader: 'Chấm công',
+    nameLabel: 'Tên',
+    namePlaceholder: 'Vui lòng nhập tên của bạn',
+    locationLabel: 'Địa điểm',
+    locationOption: 'Hong Hui',
+    checkinBtn: 'Chấm công bắt đầu',
+    checkoutBtn: 'Chấm công kết thúc',
+    logoutBtn: 'Đăng xuất',
+    emptyFields: 'Vui lòng nhập tên và địa điểm',
+    ipError: 'Không thể lấy địa chỉ IP của bạn, vui lòng kiểm tra mạng',
+    wifiError: 'Vui lòng kết nối với WIFI của nhà hàng',
+    checkinSuccess: 'Chấm công bắt đầu thành công',
+    checkoutSuccess: 'Chấm công kết thúc thành công',
+    checkinFailed: 'Chấm công thất bại',
+    logoutFailed: 'Đăng xuất thất bại'
   },
   en: {
+    // 登入畫面
     title: 'Employee Check-in System Login',
     emailLabel: 'Email',
     emailPlaceholder: 'Please enter your email',
@@ -64,9 +101,31 @@ const translations = {
     passwordResetSent: 'Password reset email sent',
     passwordResetFailed: 'Password reset failed',
     registerFailed: 'Registration failed',
-    registerSuccess: 'Registration successful, please login'
+    registerSuccess: 'Registration successful, please login',
+    // 打卡畫面
+    checkinTitle: 'Employee Check-in System',
+    checkinHeader: 'Check-in',
+    nameLabel: 'Name',
+    namePlaceholder: 'Please enter your name',
+    locationLabel: 'Location',
+    locationOption: 'Hong Hui',
+    checkinBtn: 'Check-in',
+    checkoutBtn: 'Check-out',
+    logoutBtn: 'Logout',
+    emptyFields: 'Please enter name and location',
+    ipError: 'Unable to retrieve your IP address, please check your network',
+    wifiError: 'Please connect to the restaurant WIFI',
+    checkinSuccess: 'Check-in successful',
+    checkoutSuccess: 'Check-out successful',
+    checkinFailed: 'Check-in failed',
+    logoutFailed: 'Logout failed'
   }
 };
+
+// 導出翻譯函數
+export function getTranslations(lang) {
+  return translations[lang] || translations.zh;
+}
 
 export async function showLoginForm(auth, lang = 'zh') {
   const loginContainer = document.getElementById('login-container');
@@ -198,12 +257,13 @@ function showRegisterForm(auth, lang = 'zh') {
           <input type="email" id="register-email" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.emailPlaceholder}">
         </div>
         <div>
-          <label class="block text-gray-700 mb-1">${t.passwordLabel}</label>
+          <label class="block text-gray-700 mb-1">${t.password}</label>
           <input type="password" id="register-password" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.passwordPlaceholder}">
         </div>
-        <button id="register-submit-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">${t.registerSubmit}</button>
+        <button id="register-submit" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">${t.registerSubmit}</button>
         <div class="text-center">
           <button id="back-to-login-btn" class="text-indigo-600 hover:underline">${t.backToLogin}</button>
+          <input type="text" id="passwordInput" placeholder="Enter password">
         </div>
       </div>
     </div>
@@ -218,7 +278,7 @@ function showRegisterForm(auth, lang = 'zh') {
     });
   });
 
-  document.getElementById('register-submit-btn').addEventListener('click', async () => {
+  document.getElementById('register-submit').addEventListener('click', async () => {
     const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
 
@@ -254,8 +314,8 @@ function showRegisterForm(auth, lang = 'zh') {
   });
 }
 
-function showForgotPasswordForm(auth) {
-  console.log('顯示忘記密碼表單');
+function showForgotPassword() {
+  console.log('顯示密码');
 }
 
 export async function generateDeviceFingerprint() {
@@ -274,7 +334,7 @@ function showAlert(messages) {
   const alertModal = document.getElementById('alert-modal');
   const alertMessage = document.getElementById('alert-message');
   if (!alertModal || !alertMessage) {
-    console.error('找不到 alert-modal 或 alert-message');
+    console.error('找不到 alert 或 alert-message');
     return;
   }
   alertMessage.innerHTML = `
