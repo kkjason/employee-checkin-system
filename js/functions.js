@@ -1,4 +1,4 @@
-import { collection, getDocs, addDoc, doc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 export async function getUserIPs() {
   const ipList = [];
@@ -125,7 +125,10 @@ export async function getIPWhitelist() {
     return snapshot.docs.map(doc => doc.data().ip);
   } catch (error) {
     console.error('無法獲取 IP 白名單:', error);
-    return [];
+    if (error.code === 'permission-denied') {
+      throw new Error('無法訪問 IP 白名單，請聯繫管理員檢查 Firestore 權限設置');
+    }
+    throw error;
   }
 }
 
@@ -172,21 +175,24 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
       fail: '打卡失敗：',
       ipError: '請登入餐廳WIFI後再進行打卡',
       inputError: '請輸入姓名和選擇地點！',
-      checking: '正在檢查網路連線...'
+      checking: '正在檢查網路連線...',
+      permissionError: '權限錯誤：請聯繫管理員檢查 Firestore 設置'
     },
     vi: {
       success: 'Chấm công thành công!',
       fail: 'Chấm công thất bại:',
       ipError: 'Vui lòng đăng nhập WiFi nhà hàng trước khi chấm công',
       inputError: 'Vui lòng nhập tên và chọn địa điểm!',
-      checking: 'Đang kiểm tra kết nối mạng...'
+      checking: 'Đang kiểm tra kết nối mạng...',
+      permissionError: 'Lỗi quyền hạn: Vui lòng liên hệ quản trị viên để kiểm tra cài đặt Firestore'
     },
     en: {
       success: 'Check-in successful!',
       fail: 'Check-in failed:',
       ipError: 'Please connect to the restaurant WiFi before checking in',
       inputError: 'Please enter name and select location!',
-      checking: 'Checking network connection...'
+      checking: 'Checking network connection...',
+      permissionError: 'Permission error: Please contact the administrator to check Firestore settings'
     }
   };
 
@@ -204,7 +210,15 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
 
   // 獲取多個來源的 IP 列表
   const userIPs = await getUserIPs();
-  const ipWhitelist = await getIPWhitelist();
+  let ipWhitelist;
+  try {
+    ipWhitelist = await getIPWhitelist();
+  } catch (error) {
+    statusElement.textContent = `${translations[lang].fail} ${error.message}`;
+    statusElement.classList.remove('text-green-600', 'text-blue-600', 'hidden');
+    statusElement.classList.add('text-red-600');
+    return;
+  }
   
   // 使用新的多 IP 比對函數
   if (!userIPs.length || !isAnyIPInWhitelist(userIPs, ipWhitelist)) {
@@ -232,7 +246,7 @@ export async function handleCheckin(type, name, location, lang, statusElement) {
   } catch (error) {
     console.error('打卡失敗:', error);
     if (error.code === 'permission-denied') {
-      statusElement.textContent = `${translations[lang].fail} 權限不足，請聯繫管理員檢查 Firestore 設置`;
+      statusElement.textContent = `${translations[lang].fail} ${translations[lang].permissionError}`;
     } else {
       statusElement.textContent = `${translations[lang].fail} ${error.message}`;
     }
