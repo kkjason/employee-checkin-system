@@ -1,5 +1,20 @@
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js'; // 確保導入 onAuthStateChanged
+
+// Firebase 配置
+const firebaseConfig = {
+  apiKey: "AIzaSyCv1ywEy0oaL8FNBLAEO-Ban5lMs26Y_gY",
+  authDomain: "employee-checkin-system.firebaseapp.com",
+  projectId: "employee-checkin-system",
+  storageBucket: "employee-checkin-system.firebasestorage.app",
+  messagingSenderId: "646412258577",
+  appId: "1:646412258577:web:7f32d3c069c415c9b190b0"
+};
+
+// 初始化 Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app); // 確保在初始化後獲取 auth 實例
 
 let lastDoc = null;
 let firstDoc = null;
@@ -29,9 +44,6 @@ checkinManagementBtn.addEventListener('click', () => {
 
 // 等待 DOM 載入完成
 document.addEventListener('DOMContentLoaded', () => {
-  const auth = getAuth(); // 獲取 Firebase Auth 實例
-  const db = window.db; // 確保 db 已經在全局範圍內可用
-
   // 身份驗證狀態監聽
   onAuthStateChanged(auth, async (user) => {
     if (user) {
