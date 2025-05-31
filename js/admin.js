@@ -85,8 +85,8 @@ export async function loadIPWhitelist() {
       li.innerHTML = `
         <span class="flex-1">${ip}</span>
         <div class="flex space-x-2">
-          <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg">編輯</button>
-          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg">刪除</button>
+          <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
+          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
         </div>
       `;
       ipList.appendChild(li);
@@ -95,7 +95,7 @@ export async function loadIPWhitelist() {
     // 綁定刪除按鈕事件
     document.querySelectorAll('.delete-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.closest('li').dataset.id;
+        const id = btn.dataset.id; // 確保正確獲取 id
         try {
           await deleteDoc(doc(db, 'whitelist', id)); // 使用正確的 db
           loadIPWhitelist();
@@ -109,7 +109,7 @@ export async function loadIPWhitelist() {
     // 綁定編輯按鈕事件
     document.querySelectorAll('.edit-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.closest('li').dataset.id;
+        const id = btn.dataset.id; // 確保正確獲取 id
         const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
         if (newIp) {
           try {
