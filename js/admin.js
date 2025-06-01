@@ -160,8 +160,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
         if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
       } else {
-        // 使用 endBefore 查詢前一頁
-        q = query(q, orderBy('timestamp', 'desc'), endBefore(pageDocs[currentPage].firstDoc), limit(20));
+        // 使用 endBefore 查詢前一頁，移除重複的 orderBy
+        q = query(q, endBefore(pageDocs[currentPage].firstDoc), limit(20));
       }
     }
 
@@ -249,7 +249,7 @@ export async function loadIPWhitelist() {
   try {
     const querySnapshot = await getDocs(collection(db, 'whitelist'));
     querySnapshot.forEach((doc) => {
-      const ip = doc.data().ip; // 修正語法錯誤，移除多餘的 'IP'
+      const ip = doc.data().ip;
       const li = document.createElement('li');
       li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
       li.innerHTML = `
