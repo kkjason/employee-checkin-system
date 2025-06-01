@@ -18,10 +18,6 @@ const db = getFirestore(app); // 確保 Firestore 正確初始化
 const auth = getAuth(app); // 確保 Auth 正確初始化
 
 let lastDoc = null;
-let firstDoc = null;
-let displayMode = 'original';
-let currentNameFilter = '';
-let currentLocationFilter = '';
 let currentPage = 0; // 當前頁碼
 
 // DOM 元素
@@ -158,8 +154,10 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 分頁處理
     if (direction === 'next') {
       currentPage++;
-      if (currentPage > 0) {
+      if (lastDoc) {
         q = query(q, startAfter(lastDoc));
+      } else {
+        currentPage--; // 如果沒有 lastDoc，則回退頁碼
       }
     } else if (direction === 'prev') {
       currentPage--;
@@ -194,36 +192,17 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     const totalRecords = totalSnapshot.size;
 
     // 顯示記錄
-    if (displayMode === 'original') {
-      records.forEach(record => {
-        const row = document.createElement('tr'); // 確保在這裡創建 row
-        const checkinTime = new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
-        row.innerHTML = `
-          <td class="py-3 px-4 border-b">${record.name}</td>
-          <td class="py-3 px-4 border-b">${record.location}</td>
-          <td class="py-3 px-4 border-b">${record.type === 'checkin' ? `${checkinTime}<br>${record.device}` : '-'}</td>
-          <td class="py-3 px-4 border-b">${record.type === 'checkout' ? `${checkinTime}<br>${record.device}` : '-'}</td>
-        `;
-        checkinRecords.appendChild(row);
-      });
-    } else {
-      // 配對模式邏輯
-      const pairedRecords = pairCheckinRecords(records);
-      pairedRecords.forEach(record => {
-        const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-';
-        const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-';
-        const checkinDevice = record.checkin ? record.checkin.device : '-';
-        const checkoutDevice = record.checkout ? record.checkout.device : '-';
-        const row = document.createElement('tr'); // 確保在這裡創建 row
-        row.innerHTML = `
-          <td class="py-3 px-4 border-b">${record.name}</td>
-          <td class="py-3 px-4 border-b">${record.location}</td>
-          <td class="py-3 px-4 border-b">${checkinTime}<br>${checkinDevice}</td>
-          <td class="py-3 px-4 border-b">${checkoutTime}<br>${checkoutDevice}</td>
-        `;
-        checkinRecords.appendChild(row);
-      });
-    }
+    records.forEach(record => {
+      const row = document.createElement('tr'); // 確保在這裡創建 row
+      const checkinTime = new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+      row.innerHTML = `
+        <td class="py-3 px-4 border-b">${record.name}</td>
+        <td class="py-3 px-4 border-b">${record.location}</td>
+        <td class="py-3 px-4 border-b">${record.type === 'checkin' ? `${checkinTime}<br>${record.device}` : '-'}</td>
+        <td class="py-3 px-4 border-b">${record.type === 'checkout' ? `${checkinTime}<br>${record.device}` : '-'}</td>
+      `;
+      checkinRecords.appendChild(row);
+    });
 
     // 更新分頁資訊
     recordStart.textContent = (currentPage * 20) + 1;
