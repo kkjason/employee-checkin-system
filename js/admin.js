@@ -222,7 +222,13 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
-    checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.code === 'permission-denied' ? '權限不足，請確認您是管理員' : error.message}</td></tr>`;
+    let errorMessage = error.message;
+    if (error.code === 'failed-precondition' && error.message.includes('requires an index')) {
+      errorMessage = `查詢需要索引，請在 Firebase 控制台中創建索引：${error.message.match(/https:\/\/[^\s]+/)[0]}`;
+    } else if (error.code === 'permission-denied') {
+      errorMessage = '權限不足，請確認您是管理員';
+    }
+    checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${errorMessage}</td></tr>`;
   }
 }
 
