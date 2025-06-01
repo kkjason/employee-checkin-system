@@ -29,6 +29,7 @@ const checkinManagement = document.getElementById('checkin-management');
 const ipManagementBtn = document.getElementById('ip-management-btn');
 const checkinManagementBtn = document.getElementById('checkin-management-btn');
 const logoutBtn = document.getElementById('logout-btn'); // 獲取登出按鈕
+const exportExcelBtn = document.getElementById('export-excel-btn'); // 獲取匯出 Excel 按鈕
 
 // 按鈕事件綁定
 ipManagementBtn.addEventListener('click', () => {
@@ -71,6 +72,43 @@ logoutBtn.addEventListener('click', async () => {
     alert('登出失敗: ' + error.message);
   }
 });
+
+// 匯出 Excel 按鈕事件
+exportExcelBtn.addEventListener('click', async () => {
+  const startDate = document.getElementById('start-date').value;
+  const endDate = document.getElementById('end-date').value;
+
+  if (!startDate || !endDate) {
+    alert('請選擇起訖日期');
+    return;
+  }
+
+  const records = await fetchCheckinRecords(startDate, endDate);
+  exportToExcel(records);
+});
+
+async function fetchCheckinRecords(startDate, endDate) {
+  const records = [];
+  try {
+    const q = query(collection(db, 'checkins'), where('timestamp', '>=', new Date(startDate)), where('timestamp', '<=', new Date(endDate)));
+    const querySnapshot = await getDocs(q);
+    querySnapshot.forEach((doc) => {
+      records.push({ id: doc.id, ...doc.data() });
+    });
+  } catch (error) {
+    console.error('載入打卡紀錄失敗:', error);
+  }
+  return records;
+}
+
+function exportToExcel(records) {
+  const worksheet = XLSX.utils.json_to_sheet(records);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, '打卡紀錄');
+
+  // 生成 Excel 檔案並下載
+  XLSX.writeFile(workbook, '打卡紀錄.xlsx');
+}
 
 export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
