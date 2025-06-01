@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
-import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+import { collection, getDocs, query, where, orderBy, limit, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -196,11 +196,40 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       return dateB - dateA; // 按日期降序
     });
 
+    // 處理大夜班的整合邏輯
+    const finalRecords = [];
+    displayRecords.forEach(record => {
+      const checkinDate = record.checkin ? new Date(record.checkin.timestamp) : null;
+      const checkoutDate = record.checkout ? new Date(record.checkout.timestamp) : null;
+
+      if (checkinDate && checkoutDate) {
+        // 檢查是否為跨日情況
+        if (checkoutDate.getDate() ![== checkinDate.getDate]()) {
+          // 如果上班打卡時間在下班打卡時間的12小時內，則整合
+          if ((checkoutDate - checkinDate) <= 12 * 60 * 60 * 1000) {
+            finalRecords.push({
+              name: record.name,
+              location: record.location,
+              checkin: checkinDate,
+              checkout: checkoutDate
+            });
+          }
+        } else {
+          finalRecords.push({
+            name: record.name,
+            location: record.location,
+            checkin: checkinDate,
+            checkout: checkoutDate
+          });
+        }
+      }
+    });
+
     // 渲染記錄
     checkinRecords.innerHTML = '';
-    displayRecords.forEach(record => {
-      const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-';
-      const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
+    finalRecords.forEach(record => {
+      const checkinTime = record.checkin.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+      const checkoutTime = record.checkout.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
       const row = document.createElement('tr');
       row.innerHTML = `
         <td class="py-3 px-4 border-b">${record.name}</td>
@@ -213,8 +242,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
     // 更新分頁資訊
     recordStart.textContent = (currentPage * 20) + 1;
-    recordEnd.textContent = Math.min((currentPage + 1) * 20, displayRecords.length);
-    recordTotal.textContent = displayRecords.length;
+    recordEnd.textContent = Math.min((currentPage + 1) * 20, finalRecords.length);
+    recordTotal.textContent = finalRecords.length;
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
