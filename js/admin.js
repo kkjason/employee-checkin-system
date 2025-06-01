@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, addDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -19,6 +19,8 @@ const auth = getAuth(app); // 確保 Auth 正確初始化
 
 let lastDoc = null;
 let currentPage = 0; // 當前頁碼
+let currentNameFilter = ''; // 定義當前姓名篩選
+let currentLocationFilter = ''; // 定義當前地點篩選
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
@@ -160,14 +162,13 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         currentPage--; // 如果沒有 lastDoc，則回退頁碼
       }
     } else if (direction === 'prev') {
-      currentPage--;
-      if (currentPage < 0) {
-        currentPage = 0;
-      }
-      if (currentPage === 0) {
-        q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
-      } else {
-        q = query(q, startAfter(firstDoc));
+      if (currentPage > 0) {
+        currentPage--;
+        if (currentPage === 0) {
+          q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
+        } else {
+          q = query(q, startAfter(firstDoc));
+        }
       }
     }
 
