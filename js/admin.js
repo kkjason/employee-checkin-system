@@ -42,29 +42,79 @@ const addIpBtn = document.getElementById('add-ip-btn');
 const ipInput = document.getElementById('ip-input');
 
 // 按鈕事件綁定
-ipManagementBtn.addEventListener('click', () => {
-  ipManagement.classList.remove('hidden');
-  checkinManagement.classList.add('hidden');
-  loadIPWhitelist();
-});
+function bindButtonEvents() {
+  ipManagementBtn.addEventListener('click', () => {
+    ipManagement.classList.remove('hidden');
+    checkinManagement.classList.add('hidden');
+    loadIPWhitelist();
+  });
 
-checkinManagementBtn.addEventListener('click', () => {
-  checkinManagement.classList.remove('hidden');
-  ipManagement.classList.add('hidden');
-  loadCheckinRecords();
-});
+  checkinManagementBtn.addEventListener('click', () => {
+    checkinManagement.classList.remove('hidden');
+    ipManagement.classList.add('hidden');
+    loadCheckinRecords();
+  });
 
-searchBtn.addEventListener('click', () => {
-  loadCheckinRecords(nameFilter.value, locationFilter.value, '', startDateInput.value, endDateInput.value);
-});
+  searchBtn.addEventListener('click', () => {
+    loadCheckinRecords(nameFilter.value, locationFilter.value, '', startDateInput.value, endDateInput.value);
+  });
 
-prevPageBtn.addEventListener('click', () => {
-  loadCheckinRecords(nameFilter.value, locationFilter.value, 'prev', startDateInput.value, endDateInput.value);
-});
+  prevPageBtn.addEventListener('click', () => {
+    loadCheckinRecords(nameFilter.value, locationFilter.value, 'prev', startDateInput.value, endDateInput.value);
+  });
 
-nextPageBtn.addEventListener('click', () => {
-  loadCheckinRecords(nameFilter.value, locationFilter.value, 'next', startDateInput.value, endDateInput.value);
-});
+  nextPageBtn.addEventListener('click', () => {
+    loadCheckinRecords(nameFilter.value, locationFilter.value, 'next', startDateInput.value, endDateInput.value);
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await signOut(auth);
+      console.log('登出成功');
+      window.location.href = '/index.html';
+    } catch (error) {
+      console.error('登出失敗:', error);
+      alert('登出失敗: ' + error.message);
+    }
+  });
+
+  addIpBtn.addEventListener('click', async () => {
+    const ip = ipInput.value.trim();
+    if (!ip) {
+      alert('請輸入有效的 IP 位址');
+      return;
+    }
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    if (!ipRegex.test(ip)) {
+      alert('請輸入有效的 IPv4 位址');
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'whitelist'), { ip });
+      ipInput.value = '';
+      loadIPWhitelist();
+    } catch (error) {
+      console.error('新增 IP 失敗:', error);
+      alert('新增 IP 失敗: ' + error.message);
+    }
+  });
+
+  // 匯出 Excel 按鈕事件（單次綁定）
+  exportExcelBtn.removeEventListener('click', exportExcelHandler); // 移除舊的事件監聽器
+  exportExcelBtn.addEventListener('click', exportExcelHandler);
+}
+
+function exportExcelHandler() {
+  const records = getCurrentRecords();
+  exportToExcel(records);
+}
+
+// 儲存當前顯示的記錄
+let currentRecords = [];
+
+function getCurrentRecords() {
+  return currentRecords;
+}
 
 // 等待 DOM 載入完成
 document.addEventListener('DOMContentLoaded', () => {
@@ -74,46 +124,13 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('admin-container').classList.remove('hidden');
       ipManagement.classList.remove('hidden');
       checkinManagement.classList.add('hidden');
+      bindButtonEvents();
       await loadIPWhitelist();
     } else {
       console.log('無用戶登入');
       window.location.href = '/index.html';
     }
   });
-});
-
-// 登出按鈕事件
-logoutBtn.addEventListener('click', async () => {
-  try {
-    await signOut(auth);
-    console.log('登出成功');
-    window.location.href = '/index.html';
-  } catch (error) {
-    console.error('登出失敗:', error);
-    alert('登出失敗: ' + error.message);
-  }
-});
-
-// 新增 IP 位址
-addIpBtn.addEventListener('click', async () => {
-  const ip = ipInput.value.trim();
-  if (!ip) {
-    alert('請輸入有效的 IP 位址');
-    return;
-  }
-  const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
-  if (!ipRegex.test(ip)) {
-    alert('請輸入有效的 IPv4 位址');
-    return;
-  }
-  try {
-    await addDoc(collection(db, 'whitelist'), { ip });
-    ipInput.value = '';
-    loadIPWhitelist();
-  } catch (error) {
-    console.error('新增 IP 失敗:', error);
-    alert('新增 IP 失敗: ' + error.message);
-  }
 });
 
 // 合併上下班記錄的輔助函數
@@ -143,7 +160,6 @@ function pairCheckinCheckout(records) {
           if (employeeRecords[j].type === 'checkout') {
             const timeDiff = employeeRecords[j].timestamp - checkin.timestamp;
             const hoursDiff = timeDiff / (1000 * 60 * 60);
-            // 假設出勤時間不超過 12 小時
             if (hoursDiff <= 12) {
               checkout = employeeRecords[j];
               i = j + 1; // 跳過已配對的 checkout
@@ -173,7 +189,7 @@ function pairCheckinCheckout(records) {
 }
 
 // 加載打卡紀錄的函數
-export async function loadCheckinRecords(name = '', location = '', direction = '', startDate = '', endDate = '') {
+async function loadCheckinRecords(name = '', location = '', direction = '', startDate = '', endDate = '') {
   const checkinRecords = document.getElementById('checkin-records');
   const recordStart = document.getElementById('record-start');
   const recordEnd = document.getElementById('record-end');
@@ -207,14 +223,13 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
     if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
 
-    // 分頁邏輯（按原始記錄查詢）
+    // 分頁邏輯
     if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
       currentPage++;
       q = query(q, startAfter(pageDocs[currentPage - 1].lastDoc));
     } else if (direction === 'prev' && currentPage > 0) {
       currentPage--;
       if (currentPage === 0) {
-        // 第一頁，重新構建查詢
         q = query(collection(db, 'checkins'), orderBy('name'), orderBy('timestamp', 'desc'));
         if (name) q = query(q, where('name', '==', name));
         if (location) q = query(q, where('location', '==', location));
@@ -225,7 +240,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       }
     }
 
-    // 查詢原始記錄（每頁 100 筆以確保足夠的記錄進行配對）
+    // 限制查詢數量
     q = query(q, limit(100));
     console.log(`當前頁碼: ${currentPage}`);
 
@@ -251,20 +266,20 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     const pairedRecords = pairCheckinCheckout(records);
     const startIndex = currentPage * 20;
     const endIndex = startIndex + 20;
-    const paginatedRecords = pairedRecords.slice(startIndex, endIndex);
+    currentRecords = pairedRecords.slice(startIndex, endIndex);
 
-    // 計算總記錄數（按合併後的出勤記錄計數）
+    // 計算總記錄數
     let totalQuery = query(collection(db, 'checkins'));
     if (name) totalQuery = query(totalQuery, where('name', '==', name));
     if (location) totalQuery = query(totalQuery, where('location', '==', location));
     if (startDate) totalQuery = query(totalQuery, where('timestamp', '>=', new Date(startDate).getTime()));
     if (endDate) totalQuery = query(totalQuery, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
     const totalSnapshot = await getDocs(totalQuery);
-    const totalRecords = Math.ceil(totalSnapshot.size / 2); // 假設每兩筆記錄合併為一筆出勤記錄
+    const totalRecords = Math.ceil(totalSnapshot.size / 2);
 
-    // 渲染合併後的記錄
+    // 渲染記錄
     checkinRecords.innerHTML = '';
-    paginatedRecords.forEach(record => {
+    currentRecords.forEach(record => {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td class="py-3 px-4 border-b">${record.name}</td>
@@ -283,9 +298,6 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 控制分頁按鈕狀態
     prevPageBtn.disabled = currentPage === 0;
     nextPageBtn.disabled = endIndex >= pairedRecords.length;
-
-    // 匯出 Excel 按鈕事件
-    exportExcelBtn.addEventListener('click', () => exportToExcel(paginatedRecords));
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
@@ -321,7 +333,7 @@ function exportToExcel(records) {
 }
 
 // 載入 IP 白名單的函數
-export async function loadIPWhitelist() {
+async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
   ipList.innerHTML = '';
   try {
