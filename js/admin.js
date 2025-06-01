@@ -322,3 +322,4 @@ export async function loadIPWhitelist() {
     ipList.innerHTML = `<li class="text-red-600">${error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : `載入失敗: ${error.message}`}</li>`;
   }
 }
+ 
