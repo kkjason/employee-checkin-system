@@ -23,6 +23,7 @@ let currentLocationFilter = '';
 let currentStartDate = null;
 let currentEndDate = null;
 let pageDocs = []; // 儲存每頁的 firstDoc 和 lastDoc
+let currentRecords = []; // 儲存當前顯示的記錄
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
@@ -40,8 +41,17 @@ const endDateInput = document.getElementById('end-date');
 const exportExcelBtn = document.getElementById('export-excel-btn');
 const addIpBtn = document.getElementById('add-ip-btn');
 const ipInput = document.getElementById('ip-input');
+const checkinRecords = document.getElementById('checkin-records');
+const recordStart = document.getElementById('record-start');
+const recordEnd = document.getElementById('record-end');
+const recordTotal = document.getElementById('record-total');
 
-// 按鈕事件綁定
+// 顯示載入提示
+function showLoading() {
+  checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-center">載入中...</td></tr>`;
+}
+
+// 綁定按鈕事件
 function bindButtonEvents() {
   ipManagementBtn.addEventListener('click', () => {
     ipManagement.classList.remove('hidden');
@@ -99,21 +109,7 @@ function bindButtonEvents() {
     }
   });
 
-  // 匯出 Excel 按鈕事件（單次綁定）
-  exportExcelBtn.removeEventListener('click', exportExcelHandler); // 移除舊的事件監聽器
-  exportExcelBtn.addEventListener('click', exportExcelHandler);
-}
-
-function exportExcelHandler() {
-  const records = getCurrentRecords();
-  exportToExcel(records);
-}
-
-// 儲存當前顯示的記錄
-let currentRecords = [];
-
-function getCurrentRecords() {
-  return currentRecords;
+  exportExcelBtn.addEventListener('click', () => exportToExcel(currentRecords));
 }
 
 // 等待 DOM 載入完成
@@ -154,7 +150,6 @@ function pairCheckinCheckout(records) {
       const checkin = employeeRecords[i].type === 'checkin' ? employeeRecords[i] : null;
       let checkout = null;
 
-      // 尋找下一個 checkout，且時間差在 12 小時內（處理大夜班跨日）
       if (checkin) {
         for (let j = i + 1; j < employeeRecords.length; j++) {
           if (employeeRecords[j].type === 'checkout') {
@@ -162,14 +157,13 @@ function pairCheckinCheckout(records) {
             const hoursDiff = timeDiff / (1000 * 60 * 60);
             if (hoursDiff <= 12) {
               checkout = employeeRecords[j];
-              i = j + 1; // 跳過已配對的 checkout
+              i = j + 1;
               break;
             }
           }
         }
       }
 
-      // 如果只有 checkin 或只有 checkout
       pairedRecords.push({
         name,
         location: checkin ? checkin.location : (checkout ? checkout.location : employeeRecords[i].location),
@@ -180,7 +174,7 @@ function pairCheckinCheckout(records) {
       });
 
       if (!checkin && !checkout) {
-        i++; // 處理未配對的記錄
+        i++;
       }
     }
   }
@@ -190,41 +184,36 @@ function pairCheckinCheckout(records) {
 
 // 加載打卡紀錄的函數
 async function loadCheckinRecords(name = '', location = '', direction = '', startDate = '', endDate = '') {
-  const checkinRecords = document.getElementById('checkin-records');
-  const recordStart = document.getElementById('record-start');
-  const recordEnd = document.getElementById('record-end');
-  const recordTotal = document.getElementById('record-total');
-
-  // 當篩選條件改變時，重置分頁狀態
-  if (
-    currentNameFilter !== name ||
-    currentLocationFilter !== location ||
-    currentStartDate !== startDate ||
-    currentEndDate !== endDate
-  ) {
-    currentPage = 0;
-    pageDocs = [];
-  }
-
-  currentNameFilter = name;
-  currentLocationFilter = location;
-  currentStartDate = startDate;
-  currentEndDate = endDate;
-
-  console.log(`當前篩選條件 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}`);
-
+  showLoading();
   try {
-    // 構建基本查詢
+    // 當篩選條件改變時，重置分頁狀態
+    if (
+      currentNameFilter !== name ||
+      currentLocationFilter !== location ||
+      currentStartDate !== startDate ||
+      currentEndDate !== endDate
+    ) {
+      currentPage = 0;
+      pageDocs = [];
+    }
+
+    currentNameFilter = name;
+    currentLocationFilter = location;
+    currentStartDate = startDate;
+    currentEndDate = endDate;
+
+    console.log(`當前篩選條件 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}`);
+
+    // 構建查詢
     let q = query(collection(db, 'checkins'), orderBy('name'), orderBy('timestamp', 'desc'));
 
-    // 應用篩選條件
     if (name) q = query(q, where('name', '==', name));
     if (location) q = query(q, where('location', '==', location));
     if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
     if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
 
     // 分頁邏輯
-    if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
+    if (direction === 'next' && pageDocs[currentPage]?.lastDoc) {
       currentPage++;
       q = query(q, startAfter(pageDocs[currentPage - 1].lastDoc));
     } else if (direction === 'prev' && currentPage > 0) {
@@ -240,8 +229,7 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       }
     }
 
-    // 限制查詢數量
-    q = query(q, limit(100));
+    q = query(q, limit(50)); // 減少查詢量以提高性能
     console.log(`當前頁碼: ${currentPage}`);
 
     const querySnapshot = await getDocs(q);
@@ -279,16 +267,20 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
 
     // 渲染記錄
     checkinRecords.innerHTML = '';
-    currentRecords.forEach(record => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td class="py-3 px-4 border-b">${record.name}</td>
-        <td class="py-3 px-4 border-b">${record.location}</td>
-        <td class="py-3 px-4 border-b">${record.checkinTime}<br>${record.checkinDevice}</td>
-        <td class="py-3 px-4 border-b">${record.checkoutTime}<br>${record.checkoutDevice}</td>
-      `;
-      checkinRecords.appendChild(row);
-    });
+    if (currentRecords.length === 0) {
+      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-center">無記錄</td></tr>`;
+    } else {
+      currentRecords.forEach(record => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="py-3 px-4 border-b">${record.name}</td>
+          <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${record.checkinTime}<br>${record.checkinDevice}</td>
+          <td class="py-3 px-4 border-b">${record.checkoutTime}<br>${record.checkoutDevice}</td>
+        `;
+        checkinRecords.appendChild(row);
+      });
+    }
 
     // 更新分頁資訊
     recordStart.textContent = startIndex + 1;
