@@ -22,6 +22,8 @@ let firstDoc = null;
 let currentPage = 0;
 let currentNameFilter = '';
 let currentLocationFilter = '';
+let currentStartDate = null;
+let currentEndDate = null;
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
@@ -29,6 +31,16 @@ const checkinManagement = document.getElementById('checkin-management');
 const ipManagementBtn = document.getElementById('ip-management-btn');
 const checkinManagementBtn = document.getElementById('checkin-management-btn');
 const logoutBtn = document.getElementById('logout-btn');
+const nameFilter = document.getElementById('name-filter');
+const locationFilter = document.getElementById('location-filter');
+const searchBtn = document.getElementById('search-btn');
+const prevPageBtn = document.getElementById('prev-page');
+const nextPageBtn = document.getElementById('next-page');
+const startDateInput = document.getElementById('start-date');
+const endDateInput = document.getElementById('end-date');
+const exportExcelBtn = document.getElementById('export-excel-btn');
+const addIpBtn = document.getElementById('add-ip-btn');
+const ipInput = document.getElementById('ip-input');
 
 // 按鈕事件綁定
 ipManagementBtn.addEventListener('click', () => {
@@ -41,6 +53,18 @@ checkinManagementBtn.addEventListener('click', () => {
   checkinManagement.classList.remove('hidden');
   ipManagement.classList.add('hidden');
   loadCheckinRecords();
+});
+
+searchBtn.addEventListener('click', () => {
+  loadCheckinRecords(nameFilter.value, locationFilter.value, '', startDateInput.value, endDateInput.value);
+});
+
+prevPageBtn.addEventListener('click', () => {
+  loadCheckinRecords(nameFilter.value, locationFilter.value, 'prev', startDateInput.value, endDateInput.value);
+});
+
+nextPageBtn.addEventListener('click', () => {
+  loadCheckinRecords(nameFilter.value, locationFilter.value, 'next', startDateInput.value, endDateInput.value);
 });
 
 // 等待 DOM 載入完成
@@ -71,47 +95,74 @@ logoutBtn.addEventListener('click', async () => {
   }
 });
 
+// 新增 IP 位址
+addIpBtn.addEventListener('click', async () => {
+  const ip = ipInput.value.trim();
+  if (!ip) {
+    alert('請輸入有效的 IP 位址');
+    return;
+  }
+  try {
+    await addDoc(collection(db, 'whitelist'), { ip });
+    ipInput.value = '';
+    loadIPWhitelist();
+  } catch (error) {
+    console.error('新增 IP 失敗:', error);
+    alert('新增 IP 失敗: ' + error.message);
+  }
+});
+
 // 加載打卡紀錄的函數
-export async function loadCheckinRecords(name = '', location = '', direction = '') {
+export async function loadCheckinRecords(name = '', location = '', direction = '', startDate = '', endDate = '') {
   const checkinRecords = document.getElementById('checkin-records');
   const recordStart = document.getElementById('record-start');
   const recordEnd = document.getElementById('record-end');
   const recordTotal = document.getElementById('record-total');
-  const prevPageBtn = document.getElementById('prev-page');
-  const nextPageBtn = document.getElementById('next-page');
 
-  checkinRecords.innerHTML = '';
+  // 當篩選條件改變時，重置分頁狀態
+  if (
+    currentNameFilter !== name ||
+    currentLocationFilter !== location ||
+    currentStartDate !== startDate ||
+    currentEndDate !== endDate
+  ) {
+    currentPage = 0;
+    lastDoc = null;
+    firstDoc = null;
+  }
+
   currentNameFilter = name;
   currentLocationFilter = location;
+  currentStartDate = startDate;
+  currentEndDate = endDate;
 
-  console.log(`當前篩選條件 - 姓名: ${currentNameFilter}, 地點: ${currentLocationFilter}, 方向: ${direction}`);
+  console.log(`當前篩選條件 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}`);
 
   try {
+    // 構建查詢
     let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
 
-    if (name) {
-      q = query(q, where('name', '==', name));
-    }
-    if (location) {
-      q = query(q, where('location', '==', location));
-    }
+    // 應用篩選條件
+    if (name) q = query(q, where('name', '==', name));
+    if (location) q = query(q, where('location', '==', location));
+    if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
+    if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
 
-    if (direction === 'next') {
+    // 分頁邏輯
+    if (direction === 'next' && lastDoc) {
       currentPage++;
-      if (lastDoc) {
-        q = query(q, startAfter(lastDoc));
-      } else {
-        currentPage--;
-        console.warn('沒有 lastDoc，回退頁碼');
-      }
-    } else if (direction === 'prev') {
-      if (currentPage > 0) {
-        currentPage--;
-        if (currentPage === 0) {
-          q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
-        } else {
-          q = query(q, startAfter(firstDoc));
-        }
+      q = query(q, startAfter(lastDoc));
+    } else if (direction === 'prev' && currentPage > 0) {
+      currentPage--;
+      if (currentPage === 0) {
+        // 返回第一頁時，重置查詢
+        q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
+        if (name) q = query(q, where('name', '==', name));
+        if (location) q = query(q, where('location', '==', location));
+        if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
+        if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
+      } else if (firstDoc) {
+        q = query(q, startAfter(firstDoc));
       }
     }
 
@@ -123,6 +174,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       records.push({ id: doc.id, ...doc.data() });
     });
 
+    // 更新分頁控制變數
     if (records.length > 0) {
       lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
       firstDoc = querySnapshot.docs[0];
@@ -133,10 +185,17 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       console.warn('沒有找到記錄');
     }
 
-    const totalQuery = query(collection(db, 'checkins'));
+    // 計算總記錄數（考慮篩選條件）
+    let totalQuery = query(collection(db, 'checkins'));
+    if (name) totalQuery = query(totalQuery, where('name', '==', name));
+    if (location) totalQuery = query(totalQuery, where('location', '==', location));
+    if (startDate) totalQuery = query(totalQuery, where('timestamp', '>=', new Date(startDate).getTime()));
+    if (endDate) totalQuery = query(totalQuery, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
     const totalSnapshot = await getDocs(totalQuery);
     const totalRecords = totalSnapshot.size;
 
+    // 渲染記錄
+    checkinRecords.innerHTML = '';
     records.forEach(record => {
       const row = document.createElement('tr');
       const checkinTime = new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
@@ -149,19 +208,39 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       checkinRecords.appendChild(row);
     });
 
+    // 更新分頁資訊
     recordStart.textContent = (currentPage * 20) + 1;
     recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
     recordTotal.textContent = totalRecords;
 
+    // 控制分頁按鈕狀態
     prevPageBtn.disabled = currentPage === 0;
-    nextPageBtn.disabled = !lastDoc || records.length < 20;
+    nextPageBtn.disabled = records.length < 20 || !lastDoc;
+
+    // 匯出 Excel 按鈕事件
+    exportExcelBtn.addEventListener('click', () => exportToExcel(records));
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
-    checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.message}</td></tr>`;
+    checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.code === 'permission-denied' ? '權限不足，請確認您是管理員' : error.message}</td></tr>`;
   }
 }
 
+// 匯出 Excel 功能
+function exportToExcel(records) {
+  const data = records.map(record => ({
+    姓名: record.name,
+    地點: record.location,
+    上班時間: record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+    下班時間: record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+    設備: record.device || '-'
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '打卡紀錄');
+  XLSX.writeFile(wb, `打卡紀錄_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
 
 // 載入 IP 白名單的函數
 export async function loadIPWhitelist() {
@@ -213,10 +292,6 @@ export async function loadIPWhitelist() {
     });
   } catch (error) {
     console.error('載入 IP 白名單失敗:', error);
-    if (error.code === 'permission-denied') {
-      ipList.innerHTML = `<li class="text-red-600">載入失敗: 權限不足，請確認您是管理員</li>`;
-    } else {
-      ipList.innerHTML = `<li class="text-red-600">載入失敗: ${error.message}</li>`;
-    }
+    ipList.innerHTML = `<li class="text-red-600">${error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : `載入失敗: ${error.message}`}</li>`;
   }
 }
