@@ -18,6 +18,7 @@ const db = getFirestore(app); // 確保 Firestore 正確初始化
 const auth = getAuth(app); // 確保 Auth 正確初始化
 
 let lastDoc = null;
+let firstDoc = null; // 定義 firstDoc 變數
 let currentPage = 0; // 當前頁碼
 let currentNameFilter = ''; // 定義當前姓名篩選
 let currentLocationFilter = ''; // 定義當前地點篩選
@@ -167,7 +168,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         if (currentPage === 0) {
           q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
         } else {
-          q = query(q, startAfter(firstDoc));
+          q = query(q, startAfter(firstDoc)); // 使用 firstDoc 進行分頁
         }
       }
     }
@@ -181,7 +182,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 更新分頁狀態
     if (records.length > 0) {
       lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-      firstDoc = querySnapshot.docs[0];
+      firstDoc = querySnapshot.docs[0]; // 確保 firstDoc 被正確賦值
     } else {
       lastDoc = null;
       firstDoc = null;
