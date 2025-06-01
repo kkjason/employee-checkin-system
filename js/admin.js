@@ -14,48 +14,47 @@ const firebaseConfig = {
 
 // 初始化 Firebase
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app); // 確保 Firestore 正確初始化
-const auth = getAuth(app); // 確保 Auth 正確初始化
+const db = getFirestore(app);
+const auth = getAuth(app);
 
 let lastDoc = null;
-let firstDoc = null; // 定義 firstDoc 變數
-let currentPage = 0; // 當前頁碼
-let currentNameFilter = ''; // 定義當前姓名篩選
-let currentLocationFilter = ''; // 定義當前地點篩選
+let firstDoc = null;
+let currentPage = 0;
+let currentNameFilter = '';
+let currentLocationFilter = '';
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
 const checkinManagement = document.getElementById('checkin-management');
 const ipManagementBtn = document.getElementById('ip-management-btn');
 const checkinManagementBtn = document.getElementById('checkin-management-btn');
-const logoutBtn = document.getElementById('logout-btn'); // 獲取登出按鈕
+const logoutBtn = document.getElementById('logout-btn');
 
 // 按鈕事件綁定
 ipManagementBtn.addEventListener('click', () => {
   ipManagement.classList.remove('hidden');
   checkinManagement.classList.add('hidden');
-  loadIPWhitelist(); // 載入 IP 白名單
+  loadIPWhitelist();
 });
 
 checkinManagementBtn.addEventListener('click', () => {
   checkinManagement.classList.remove('hidden');
   ipManagement.classList.add('hidden');
-  loadCheckinRecords(); // 載入打卡紀錄
+  loadCheckinRecords();
 });
 
 // 等待 DOM 載入完成
 document.addEventListener('DOMContentLoaded', () => {
-  // 身份驗證狀態監聽
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
       document.getElementById('admin-container').classList.remove('hidden');
-      ipManagement.classList.remove('hidden'); // 預設顯示 IP 管理
+      ipManagement.classList.remove('hidden');
       checkinManagement.classList.add('hidden');
-      await loadIPWhitelist(); // 載入 IP 白名單
+      await loadIPWhitelist();
     } else {
       console.log('無用戶登入');
-      window.location.href = '/index.html'; // 導向登入頁面
+      window.location.href = '/index.html';
     }
   });
 });
@@ -65,7 +64,7 @@ logoutBtn.addEventListener('click', async () => {
   try {
     await signOut(auth);
     console.log('登出成功');
-    window.location.href = '/index.html'; // 登出後導向登入頁面
+    window.location.href = '/index.html';
   } catch (error) {
     console.error('登出失敗:', error);
     alert('登出失敗: ' + error.message);
@@ -85,10 +84,11 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   currentNameFilter = name;
   currentLocationFilter = location;
 
-  try {
-    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
+  console.log(`當前篩選條件 - 姓名: ${currentNameFilter}, 地點: ${currentLocationFilter}, 方向: ${direction}`);
 
-    // 應用篩選條件
+  try {
+    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
+
     if (name) {
       q = query(q, where('name', '==', name));
     }
@@ -96,24 +96,26 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       q = query(q, where('location', '==', location));
     }
 
-    // 分頁處理
     if (direction === 'next') {
       currentPage++;
       if (lastDoc) {
         q = query(q, startAfter(lastDoc));
       } else {
-        currentPage--; // 如果沒有 lastDoc，則回退頁碼
+        currentPage--;
+        console.warn('沒有 lastDoc，回退頁碼');
       }
     } else if (direction === 'prev') {
       if (currentPage > 0) {
         currentPage--;
         if (currentPage === 0) {
-          q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
+          q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
         } else {
-          q = query(q, startAfter(firstDoc)); // 使用 firstDoc 進行分頁
+          q = query(q, startAfter(firstDoc));
         }
       }
     }
+
+    console.log(`當前頁碼: ${currentPage}`);
 
     const querySnapshot = await getDocs(q);
     const records = [];
@@ -121,23 +123,22 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       records.push({ id: doc.id, ...doc.data() });
     });
 
-    // 更新分頁狀態
     if (records.length > 0) {
       lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-      firstDoc = querySnapshot.docs[0]; // 確保 firstDoc 被正確賦值
+      firstDoc = querySnapshot.docs[0];
+      console.log(`加載 ${records.length} 條記錄`);
     } else {
       lastDoc = null;
       firstDoc = null;
+      console.warn('沒有找到記錄');
     }
 
-    // 總記錄數（近似估計，可能需要額外查詢）
     const totalQuery = query(collection(db, 'checkins'));
     const totalSnapshot = await getDocs(totalQuery);
     const totalRecords = totalSnapshot.size;
 
-    // 顯示記錄
     records.forEach(record => {
-      const row = document.createElement('tr'); // 確保在這裡創建 row
+      const row = document.createElement('tr');
       const checkinTime = new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
       row.innerHTML = `
         <td class="py-3 px-4 border-b">${record.name}</td>
@@ -148,12 +149,10 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       checkinRecords.appendChild(row);
     });
 
-    // 更新分頁資訊
     recordStart.textContent = (currentPage * 20) + 1;
     recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
     recordTotal.textContent = totalRecords;
 
-    // 控制分頁按鈕
     prevPageBtn.disabled = currentPage === 0;
     nextPageBtn.disabled = !lastDoc || records.length < 20;
 
@@ -168,7 +167,7 @@ export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
   ipList.innerHTML = '';
   try {
-    const querySnapshot = await getDocs(collection(db, 'whitelist')); // 使用正確的 db
+    const querySnapshot = await getDocs(collection(db, 'whitelist'));
     querySnapshot.forEach((doc) => {
       const ip = doc.data().ip;
       const li = document.createElement('li');
@@ -183,12 +182,11 @@ export async function loadIPWhitelist() {
       ipList.appendChild(li);
     });
 
-    // 綁定刪除按鈕事件
     document.querySelectorAll('.delete-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.dataset.id; // 確保正確獲取 id
+        const id = btn.dataset.id;
         try {
-          await deleteDoc(doc(db, 'whitelist', id)); // 使用正確的 db
+          await deleteDoc(doc(db, 'whitelist', id));
           loadIPWhitelist();
         } catch (error) {
           console.error('刪除 IP 失敗:', error);
@@ -197,14 +195,13 @@ export async function loadIPWhitelist() {
       });
     });
 
-    // 綁定編輯按鈕事件
     document.querySelectorAll('.edit-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.dataset.id; // 確保正確獲取 id
+        const id = btn.dataset.id;
         const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
         if (newIp) {
           try {
-            await updateDoc(doc(db, 'whitelist', id), { ip: newIp }); // 使用正確的 db
+            await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
             loadIPWhitelist();
           } catch (error) {
             console.error('更新 IP 失敗:', error);
