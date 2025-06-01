@@ -29,7 +29,6 @@ const checkinManagement = document.getElementById('checkin-management');
 const ipManagementBtn = document.getElementById('ip-management-btn');
 const checkinManagementBtn = document.getElementById('checkin-management-btn');
 const logoutBtn = document.getElementById('logout-btn'); // 獲取登出按鈕
-const exportExcelBtn = document.getElementById('export-excel-btn'); // 獲取匯出 Excel 按鈕
 
 // 按鈕事件綁定
 ipManagementBtn.addEventListener('click', () => {
@@ -73,102 +72,7 @@ logoutBtn.addEventListener('click', async () => {
   }
 });
 
-// 匯出 Excel 按鈕事件
-exportExcelBtn.addEventListener('click', async () => {
-  const startDate = document.getElementById('start-date').value;
-  const endDate = document.getElementById('end-date').value;
-
-  if (!startDate || !endDate) {
-    alert('請選擇起訖日期');
-    return;
-  }
-
-  const records = await fetchCheckinRecords(startDate, endDate);
-  exportToExcel(records);
-});
-
-async function fetchCheckinRecords(startDate, endDate) {
-  const records = [];
-  try {
-    const q = query(collection(db, 'checkins'), where('timestamp', '>=', new Date(startDate)), where('timestamp', '<=', new Date(endDate)));
-    const querySnapshot = await getDocs(q);
-    querySnapshot.forEach((doc) => {
-      records.push({ id: doc.id, ...doc.data() });
-    });
-  } catch (error) {
-    console.error('載入打卡紀錄失敗:', error);
-  }
-  return records;
-}
-
-function exportToExcel(records) {
-  const worksheet = XLSX.utils.json_to_sheet(records);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, '打卡紀錄');
-
-  // 生成 Excel 檔案並下載
-  XLSX.writeFile(workbook, '打卡紀錄.xlsx');
-}
-
-export async function loadIPWhitelist() {
-  const ipList = document.getElementById('ip-list');
-  ipList.innerHTML = '';
-  try {
-    const querySnapshot = await getDocs(collection(db, 'whitelist')); // 使用正確的 db
-    querySnapshot.forEach((doc) => {
-      const ip = doc.data().ip;
-      const li = document.createElement('li');
-      li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
-      li.innerHTML = `
-        <span class="flex-1">${ip}</span>
-        <div class="flex space-x-2">
-          <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
-          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
-        </div>
-      `;
-      ipList.appendChild(li);
-    });
-
-    // 綁定刪除按鈕事件
-    document.querySelectorAll('.delete-ip-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id; // 確保正確獲取 id
-        try {
-          await deleteDoc(doc(db, 'whitelist', id)); // 使用正確的 db
-          loadIPWhitelist();
-        } catch (error) {
-          console.error('刪除 IP 失敗:', error);
-          alert('刪除失敗: ' + error.message);
-        }
-      });
-    });
-
-    // 綁定編輯按鈕事件
-    document.querySelectorAll('.edit-ip-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id; // 確保正確獲取 id
-        const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
-        if (newIp) {
-          try {
-            await updateDoc(doc(db, 'whitelist', id), { ip: newIp }); // 使用正確的 db
-            loadIPWhitelist();
-          } catch (error) {
-            console.error('更新 IP 失敗:', error);
-            alert('更新失敗: ' + error.message);
-          }
-        }
-      });
-    });
-  } catch (error) {
-    console.error('載入 IP 白名單失敗:', error);
-    if (error.code === 'permission-denied') {
-      ipList.innerHTML = `<li class="text-red-600">載入失敗: 權限不足，請確認您是管理員</li>`;
-    } else {
-      ipList.innerHTML = `<li class="text-red-600">載入失敗: ${error.message}</li>`;
-    }
-  }
-}
-
+// 加載打卡紀錄的函數
 export async function loadCheckinRecords(name = '', location = '', direction = '') {
   const checkinRecords = document.getElementById('checkin-records');
   const recordStart = document.getElementById('record-start');
@@ -255,31 +159,66 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
-    if (error.code === 'permission-denied') {
-      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: 權限不足，請確認您是管理員</td></tr>`;
-    } else {
-      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.message}</td></tr>`;
-    }
+    checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.message}</td></tr>`;
   }
 }
 
-function pairCheckinRecords(records) {
-  const paired = {};
-  records.forEach(record => {
-    const key = `${record.name}_${record.location}_${new Date(record.timestamp).toLocaleDateString('zh-TW')}`;
-    if (!paired[key]) {
-      paired[key] = { name: record.name, location: record.location };
-    }
-    if (record.type === 'checkin') {
-      paired[key].checkin = record;
-    } else if (record.type === 'checkout') {
-      paired[key].checkout = record;
-    }
-  });
-  return Object.values(paired);
-}
+// 載入 IP 白名單的函數
+export async function loadIPWhitelist() {
+  const ipList = document.getElementById('ip-list');
+  ipList.innerHTML = '';
+  try {
+    const querySnapshot = await getDocs(collection(db, 'whitelist')); // 使用正確的 db
+    querySnapshot.forEach((doc) => {
+      const ip = doc.data().ip;
+      const li = document.createElement('li');
+      li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
+      li.innerHTML = `
+        <span class="flex-1">${ip}</span>
+        <div class="flex space-x-2">
+          <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
+          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
+        </div>
+      `;
+      ipList.appendChild(li);
+    });
 
-export function toggleDisplayMode(mode) {
-  displayMode = mode;
-  loadCheckinRecords(currentNameFilter, currentLocationFilter);
+    // 綁定刪除按鈕事件
+    document.querySelectorAll('.delete-ip-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id; // 確保正確獲取 id
+        try {
+          await deleteDoc(doc(db, 'whitelist', id)); // 使用正確的 db
+          loadIPWhitelist();
+        } catch (error) {
+          console.error('刪除 IP 失敗:', error);
+          alert('刪除失敗: ' + error.message);
+        }
+      });
+    });
+
+    // 綁定編輯按鈕事件
+    document.querySelectorAll('.edit-ip-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id; // 確保正確獲取 id
+        const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
+        if (newIp) {
+          try {
+            await updateDoc(doc(db, 'whitelist', id), { ip: newIp }); // 使用正確的 db
+            loadIPWhitelist();
+          } catch (error) {
+            console.error('更新 IP 失敗:', error);
+            alert('更新失敗: ' + error.message);
+          }
+        }
+      });
+    });
+  } catch (error) {
+    console.error('載入 IP 白名單失敗:', error);
+    if (error.code === 'permission-denied') {
+      ipList.innerHTML = `<li class="text-red-600">載入失敗: 權限不足，請確認您是管理員</li>`;
+    } else {
+      ipList.innerHTML = `<li class="text-red-600">載入失敗: ${error.message}</li>`;
+    }
+  }
 }
