@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
-import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -17,13 +17,12 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-let lastDoc = null;
-let firstDoc = null;
 let currentPage = 0;
 let currentNameFilter = '';
 let currentLocationFilter = '';
 let currentStartDate = null;
 let currentEndDate = null;
+let pageDocs = []; // 儲存每頁的 firstDoc 和 lastDoc
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
@@ -127,8 +126,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     currentEndDate !== endDate
   ) {
     currentPage = 0;
-    lastDoc = null;
-    firstDoc = null;
+    pageDocs = [];
   }
 
   currentNameFilter = name;
@@ -139,7 +137,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   console.log(`當前篩選條件 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}`);
 
   try {
-    // 構建查詢
+    // 構建基本查詢
     let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
 
     // 應用篩選條件
@@ -149,20 +147,21 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
 
     // 分頁邏輯
-    if (direction === 'next' && lastDoc) {
+    if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
       currentPage++;
-      q = query(q, startAfter(lastDoc));
+      q = query(q, startAfter(pageDocs[currentPage - 1].lastDoc));
     } else if (direction === 'prev' && currentPage > 0) {
       currentPage--;
       if (currentPage === 0) {
-        // 返回第一頁時，重置查詢
+        // 第一頁，重新構建查詢
         q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
         if (name) q = query(q, where('name', '==', name));
         if (location) q = query(q, where('location', '==', location));
         if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
         if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
-      } else if (firstDoc) {
-        q = query(q, startAfter(firstDoc));
+      } else {
+        // 使用 endBefore 查詢前一頁
+        q = query(q, orderBy('timestamp', 'desc'), endBefore(pageDocs[currentPage].firstDoc), limit(20));
       }
     }
 
@@ -176,12 +175,13 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
     // 更新分頁控制變數
     if (records.length > 0) {
-      lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-      firstDoc = querySnapshot.docs[0];
+      pageDocs[currentPage] = {
+        firstDoc: querySnapshot.docs[0],
+        lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1]
+      };
       console.log(`加載 ${records.length} 條記錄`);
     } else {
-      lastDoc = null;
-      firstDoc = null;
+      pageDocs[currentPage] = { firstDoc: null, lastDoc: null };
       console.warn('沒有找到記錄');
     }
 
@@ -215,7 +215,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
     // 控制分頁按鈕狀態
     prevPageBtn.disabled = currentPage === 0;
-    nextPageBtn.disabled = records.length < 20 || !lastDoc;
+    nextPageBtn.disabled = records.length < 20 || !pageDocs[currentPage]?.lastDoc;
 
     // 匯出 Excel 按鈕事件
     exportExcelBtn.addEventListener('click', () => exportToExcel(records));
@@ -249,7 +249,7 @@ export async function loadIPWhitelist() {
   try {
     const querySnapshot = await getDocs(collection(db, 'whitelist'));
     querySnapshot.forEach((doc) => {
-      const ip = doc.data().ip;
+      const ip = doc.data().ip IP;
       const li = document.createElement('li');
       li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
       li.innerHTML = `
