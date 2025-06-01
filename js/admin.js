@@ -202,8 +202,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       row.innerHTML = `
         <td class="py-3 px-4 border-b">${record.name}</td>
         <td class="py-3 px-4 border-b">${record.location}</td>
-        <td class="py-3 px-4 border-b">${record.type === 'checkin' ? `${checkinTime}<br>${record.device}` : '-'}</td>
-        <td class="py-3 px-4 border-b">${record.type === 'checkout' ? `${checkinTime}<br>${record.device}` : '-'}</td>
+        <td class="py-3 px-4 border-b">${record.type === 'checkin' ? `${checkinTime}<br>${record.device || '-'}` : '-'}</td>
+        <td class="py-3 px-4 border-b">${record.type === 'checkout' ? `${checkinTime}<br>${record.device || '-'}` : '-'}</td>
       `;
       checkinRecords.appendChild(row);
     });
@@ -249,7 +249,7 @@ export async function loadIPWhitelist() {
   try {
     const querySnapshot = await getDocs(collection(db, 'whitelist'));
     querySnapshot.forEach((doc) => {
-      const ip = doc.data().ip IP;
+      const ip = doc.data().ip; // 修正語法錯誤，移除多餘的 'IP'
       const li = document.createElement('li');
       li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
       li.innerHTML = `
