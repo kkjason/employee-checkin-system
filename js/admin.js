@@ -104,11 +104,10 @@ export async function loadCheckinRecords(name = '', location = '', startDate = '
         const checkoutDate = new Date(record.checkout.timestamp);
         
         // 如果上班時間在前一天的晚上，則將其視為跨日
-if (checkinDate.getDate() ![== checkoutDate.getDate]()) {
-    checkinDate.setDate(checkinDate.getDate() - 1);
-}
+        if (checkinDate.getDate() ![== checkoutDate.getDate]()) {
+          checkinDate.setDate(checkinDate.getDate() - 1);
+        }
 
-        
         finalRecords.push({
           name: record.name,
           location: record.location,
