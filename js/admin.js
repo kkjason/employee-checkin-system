@@ -162,6 +162,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   }
 }
 
+
 // 載入 IP 白名單的函數
 export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
