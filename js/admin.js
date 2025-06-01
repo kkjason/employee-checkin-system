@@ -1,90 +1,245 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>員工打卡系統管理</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
-</head>
-<body class="bg-gradient-to-r from-blue-100 to-indigo-100 min-h-screen p-4">
-  <div class="container mx-auto">
-    <!-- 管理頁面容器 -->
-    <div id="admin-container" class="hidden">
-      <!-- 頁面標題 -->
-      <h1 class="text-3xl font-bold text-indigo-700 mb-6 text-center">員工打卡系統管理</h1>
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, deleteDoc, doc, updateDoc, addDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-      <!-- 按鈕區域 -->
-      <div class="flex justify-center mb-6">
-        <button id="ip-management-btn" class="mx-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">IP 管理</button>
-        <button id="checkin-management-btn" class="mx-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">打卡列表</button>
-      </div>
+// Firebase 配置
+const firebaseConfig = {
+  apiKey: "AIzaSyCv1ywEy0oaL8FNBLAEO-Ban5lMs26Y_gY",
+  authDomain: "employee-checkin-system.firebaseapp.com",
+  projectId: "employee-checkin-system",
+  storageBucket: "employee-checkin-system.firebasestorage.app",
+  messagingSenderId: "646412258577",
+  appId: "1:646412258577:web:7f32d3c069c415c9b190b0"
+};
 
-      <!-- IP 白名單管理區塊 -->
-      <div id="ip-management" class="bg-white p-6 rounded-xl shadow-lg hidden">
-        <h2 class="text-2xl font-bold text-indigo-700 mb-4">IP 白名單管理</h2>
-        <div class="space-y-4">
-          <input id="ip-input" type="text" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="輸入 IP 位址 (例如 192.168.1.1)">
-          <button id="add-ip-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">新增 IP</button>
-          <h3 class="text-xl font-semibold text-indigo-700 mt-4">IP 白名單列表</h3>
-          <ul id="ip-list" class="space-y-2 max-h-96 overflow-y-auto"></ul>
+// 初始化 Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app); // 確保 Firestore 正確初始化
+const auth = getAuth(app); // 確保 Auth 正確初始化
+
+let lastDoc = null;
+let currentPage = 0; // 當前頁碼
+
+// DOM 元素
+const ipManagement = document.getElementById('ip-management');
+const checkinManagement = document.getElementById('checkin-management');
+const ipManagementBtn = document.getElementById('ip-management-btn');
+const checkinManagementBtn = document.getElementById('checkin-management-btn');
+const logoutBtn = document.getElementById('logout-btn'); // 獲取登出按鈕
+
+// 按鈕事件綁定
+ipManagementBtn.addEventListener('click', () => {
+  ipManagement.classList.remove('hidden');
+  checkinManagement.classList.add('hidden');
+  loadIPWhitelist(); // 載入 IP 白名單
+});
+
+checkinManagementBtn.addEventListener('click', () => {
+  checkinManagement.classList.remove('hidden');
+  ipManagement.classList.add('hidden');
+  loadCheckinRecords(); // 載入打卡紀錄
+});
+
+// 等待 DOM 載入完成
+document.addEventListener('DOMContentLoaded', () => {
+  // 身份驗證狀態監聽
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
+      document.getElementById('admin-container').classList.remove('hidden');
+      ipManagement.classList.remove('hidden'); // 預設顯示 IP 管理
+      checkinManagement.classList.add('hidden');
+      await loadIPWhitelist(); // 載入 IP 白名單
+    } else {
+      console.log('無用戶登入');
+      window.location.href = '/index.html'; // 導向登入頁面
+    }
+  });
+});
+
+// 登出按鈕事件
+logoutBtn.addEventListener('click', async () => {
+  try {
+    await signOut(auth);
+    console.log('登出成功');
+    window.location.href = '/index.html'; // 登出後導向登入頁面
+  } catch (error) {
+    console.error('登出失敗:', error);
+    alert('登出失敗: ' + error.message);
+  }
+});
+
+export async function loadIPWhitelist() {
+  const ipList = document.getElementById('ip-list');
+  ipList.innerHTML = '';
+  try {
+    const querySnapshot = await getDocs(collection(db, 'whitelist')); // 使用正確的 db
+    querySnapshot.forEach((doc) => {
+      const ip = doc.data().ip;
+      const li = document.createElement('li');
+      li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
+      li.innerHTML = `
+        <span class="flex-1">${ip}</span>
+        <div class="flex space-x-2">
+          <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
+          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
         </div>
-      </div>
+      `;
+      ipList.appendChild(li);
+    });
 
-      <!-- 打卡紀錄列表區塊 -->
-      <div id="checkin-management" class="bg-white p-6 rounded-xl shadow-lg hidden">
-        <h2 class="text-2xl font-bold text-indigo-700 mb-4">打卡紀錄查詢</h2>
-        <div class="space-y-4">
-          <div class="flex gap-2">
-            <input id="name-filter" type="text" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="依姓名篩選">
-            <select id="location-filter" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="">所有地點</option>
-              <option value="宏匯">宏匯</option>
-            </select>
-          </div>
-          <button id="search-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">查詢</button>
-        </div>
+    // 綁定刪除按鈕事件
+    document.querySelectorAll('.delete-ip-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id; // 確保正確獲取 id
+        try {
+          await deleteDoc(doc(db, 'whitelist', id)); // 使用正確的 db
+          loadIPWhitelist();
+        } catch (error) {
+          console.error('刪除 IP 失敗:', error);
+          alert('刪除失敗: ' + error.message);
+        }
+      });
+    });
 
-        <!-- 打卡紀錄列表 -->
-        <div class="mt-6">
-          <h2 class="text-2xl font-bold text-indigo-700">打卡紀錄列表</h2>
-          <div class="overflow-x-auto">
-            <table class="min-w-full bg-white">
-              <thead class="bg-gray-100">
-                <tr>
-                  <th class="py-3 px-4 text-left font-semibold text-gray-700">姓名</th>
-                  <th class="py-3 px-4 text-left font-semibold text-gray-700">地點</th>
-                  <th class="py-3 px-4 text-left font-semibold text-gray-700">上班時間/設備</th>
-                  <th class="py-3 px-4 text-left font-semibold text-gray-700">下班時間/設備</th>
-                </tr>
-              </thead>
-              <tbody id="checkin-records">
-                <!-- 打卡紀錄將由 JavaScript 動態生成 -->
-              </tbody>
-            </table>
-          </div>
+    // 綁定編輯按鈕事件
+    document.querySelectorAll('.edit-ip-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id; // 確保正確獲取 id
+        const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
+        if (newIp) {
+          try {
+            await updateDoc(doc(db, 'whitelist', id), { ip: newIp }); // 使用正確的 db
+            loadIPWhitelist();
+          } catch (error) {
+            console.error('更新 IP 失敗:', error);
+            alert('更新失敗: ' + error.message);
+          }
+        }
+      });
+    });
+  } catch (error) {
+    console.error('載入 IP 白名單失敗:', error);
+    if (error.code === 'permission-denied') {
+      ipList.innerHTML = `<li class="text-red-600">載入失敗: 權限不足，請確認您是管理員</li>`;
+    } else {
+      ipList.innerHTML = `<li class="text-red-600">載入失敗: ${error.message}</li>`;
+    }
+  }
+}
 
-          <!-- 分頁控制 -->
-          <div class="mt-4 flex justify-between items-center">
-            <div class="text-sm text-gray-600">
-              顯示 <span id="record-start">1</span> - <span id="record-end">20</span> 筆，共 <span id="record-total">0</span> 筆
-            </div>
-            <div class="flex gap-2">
-              <button id="prev-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">上一頁</button>
-              <button id="next-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">下一頁</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 登出按鈕 -->
-      <div class="mt-6 text-center">
-        <button id="logout-btn" class="inline-block bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition-colors duration-200">登出</button>
-        <a href="/index.html" class="ml-4 text-indigo-600 hover:underline">返回打卡頁面</a>
-      </div>
-    </div>
-  </div>
+export async function loadCheckinRecords(name = '', location = '', direction = '') {
+  const checkinRecords = document.getElementById('checkin-records');
+  const recordStart = document.getElementById('record-start');
+  const recordEnd = document.getElementById('record-end');
+  const recordTotal = document.getElementById('record-total');
+  const prevPageBtn = document.getElementById('prev-page');
+  const nextPageBtn = document.getElementById('next-page');
 
-  <script type="module" src="/js/admin.js"></script>
-</body>
-</html>
+  checkinRecords.innerHTML = '';
+  currentNameFilter = name;
+  currentLocationFilter = location;
+
+  try {
+    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
+
+    // 應用篩選條件
+    if (name) {
+      q = query(q, where('name', '==', name));
+    }
+    if (location) {
+      q = query(q, where('location', '==', location));
+    }
+
+    // 分頁處理
+    if (direction === 'next') {
+      currentPage++;
+      if (lastDoc) {
+        q = query(q, startAfter(lastDoc));
+      } else {
+        currentPage--; // 如果沒有 lastDoc，則回退頁碼
+      }
+    } else if (direction === 'prev') {
+      currentPage--;
+      if (currentPage < 0) {
+        currentPage = 0;
+      }
+      if (currentPage === 0) {
+        q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20)); // 使用正確的 db
+      } else {
+        q = query(q, startAfter(firstDoc));
+      }
+    }
+
+    const querySnapshot = await getDocs(q);
+    const records = [];
+    querySnapshot.forEach((doc) => {
+      records.push({ id: doc.id, ...doc.data() });
+    });
+
+    // 更新分頁狀態
+    if (records.length > 0) {
+      lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      firstDoc = querySnapshot.docs[0];
+    } else {
+      lastDoc = null;
+      firstDoc = null;
+    }
+
+    // 總記錄數（近似估計，可能需要額外查詢）
+    const totalQuery = query(collection(db, 'checkins'));
+    const totalSnapshot = await getDocs(totalQuery);
+    const totalRecords = totalSnapshot.size;
+
+    // 顯示記錄
+    records.forEach(record => {
+      const row = document.createElement('tr'); // 確保在這裡創建 row
+      const checkinTime = new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+      row.innerHTML = `
+        <td class="py-3 px-4 border-b">${record.name}</td>
+        <td class="py-3 px-4 border-b">${record.location}</td>
+        <td class="py-3 px-4 border-b">${record.type === 'checkin' ? `${checkinTime}<br>${record.device}` : '-'}</td>
+        <td class="py-3 px-4 border-b">${record.type === 'checkout' ? `${checkinTime}<br>${record.device}` : '-'}</td>
+      `;
+      checkinRecords.appendChild(row);
+    });
+
+    // 更新分頁資訊
+    recordStart.textContent = (currentPage * 20) + 1;
+    recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
+    recordTotal.textContent = totalRecords;
+
+    // 控制分頁按鈕
+    prevPageBtn.disabled = currentPage === 0;
+    nextPageBtn.disabled = !lastDoc || records.length < 20;
+
+  } catch (error) {
+    console.error('載入打卡紀錄失敗:', error);
+    if (error.code === 'permission-denied') {
+      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: 權限不足，請確認您是管理員</td></tr>`;
+    } else {
+      checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.message}</td></tr>`;
+    }
+  }
+}
+
+function pairCheckinRecords(records) {
+  const paired = {};
+  records.forEach(record => {
+    const key = `${record.name}_${record.location}_${new Date(record.timestamp).toLocaleDateString('zh-TW')}`;
+    if (!paired[key]) {
+      paired[key] = { name: record.name, location: record.location };
+    }
+    if (record.type === 'checkin') {
+      paired[key].checkin = record;
+    } else if (record.type === 'checkout') {
+      paired[key].checkout = record;
+    }
+  });
+  return Object.values(paired);
+}
+
+export function toggleDisplayMode(mode) {
+  displayMode = mode;
+  loadCheckinRecords(currentNameFilter, currentLocationFilter);
+}
