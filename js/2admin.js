@@ -155,7 +155,7 @@ function parseTimestamp(timestamp) {
       return new Date(timestamp).getTime();
     }
 
-    // 處理 "YYYY/M/D 上午H:mm:ss" 或 "YYYY/M/D 下午H:mm:ss"
+    // 處理 "YYYY/M/D H:mm:ss" 或 "YYYY/M/D 上午H:mm:ss" 或 "YYYY/M/D 下午H:mm:ss"
     let datePart, timePart, isPM = false;
     if (timestamp.includes('上午') || timestamp.includes('下午')) {
       isPM = timestamp.includes('下午');
@@ -164,7 +164,7 @@ function parseTimestamp(timestamp) {
       [datePart, timePart] = timestamp.split(' ');
     }
 
-    const [year, month, day] = datePart.split('/').map(Number);
+    const [year, month, day] = datePart.split(/[-/]/).map(Number);
     let [hour, minute, second] = timePart.split(':').map(Number);
 
     // 處理上午/下午（下午加 12 小時，除非是 12 點）
@@ -328,29 +328,25 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         // 按時間排序
         records.sort((a, b) => a.timestamp - b.timestamp);
 
-        let i = 0;
-        while (i < records.length) {
-          const [name, location, date] = key.split('_');
-          const record = { name, location, date, checkin: null, checkout: null };
+        const [name, location, date] = key.split('_');
+        let record = { name, location, date, checkin: null, checkout: null };
 
-          if (records[i].type === 'checkin') {
-            record.checkin = { timestamp: records[i].timestamp, device: records[i].device || '-' };
-            // 尋找同一天的下一個 checkout
-            let j = i + 1;
-            while (j < records.length && records[j].type !== 'checkout') {
-              j++;
-            }
-            if (j < records.length && formatDate(records[j].timestamp) === date) {
-              record.checkout = { timestamp: records[j].timestamp, device: records[j].device || '-' };
-              i = j + 1; // 跳過已配對的 checkout
-            } else {
-              i++; // 無配對 checkout，保留單獨 checkin
-            }
-          } else {
-            // 開頭為 checkout，作為獨立紀錄
-            record.checkout = { timestamp: records[i].timestamp, device: records[i].device || '-' };
-            i++;
+        // 尋找最早的 checkin 和最晚的 checkout
+        let earliestCheckin = null;
+        let latestCheckout = null;
+
+        records.forEach(r => {
+          if (r.type === 'checkin' && (!earliestCheckin || r.timestamp < earliestCheckin.timestamp)) {
+            earliestCheckin = { timestamp: r.timestamp, device: r.device || '-' };
           }
+          if (r.type === 'checkout' && (!latestCheckout || r.timestamp > latestCheckout.timestamp)) {
+            latestCheckout = { timestamp: r.timestamp, device: r.device || '-' };
+          }
+        });
+
+        if (earliestCheckin || latestCheckout) {
+          record.checkin = earliestCheckin;
+          record.checkout = latestCheckout;
           consolidatedRecords.push(record);
         }
       });
