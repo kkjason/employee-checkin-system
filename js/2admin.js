@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
-import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -24,7 +24,7 @@ let currentStartDate = null;
 let currentEndDate = null;
 let pageDocs = [];
 let viewMode = 'raw';
-let allRecords = []; // 用於儲存所有紀錄以供匯出
+let allRecords = [];
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
@@ -84,33 +84,28 @@ consolidatedRecordsBtn.addEventListener('click', () => {
 
 // 等待 DOM 載入完成
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('開始檢查身份驗證狀態');
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      console.log('用戶已登入，UID:', user.uid, '電子郵件:', user.email);
+      console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
+      // 檢查管理員權限
       try {
-        // 可選：檢查是否為管理員（需要自訂聲明或 Firestore 查詢）
-        // 示例：假設管理員 UID 儲存在 Firestore 的 admins 集合
-        /*
-        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-        if (!adminDoc.exists()) {
-          console.log('用戶非管理員，重定向到 /2index.html');
-          window.location.href = '/2index.html';
-          return;
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+          document.getElementById('admin-container').classList.remove('hidden');
+          ipManagement.classList.remove('hidden');
+          checkinManagement.classList.add('hidden');
+          await loadIPWhitelist();
+        } else {
+          console.log('無管理員權限');
+          window.location.href = '/2admin_login.html';
         }
-        */
-        document.getElementById('admin-container').classList.remove('hidden');
-        ipManagement.classList.remove('hidden');
-        checkinManagement.classList.add('hidden');
-        await loadIPWhitelist();
       } catch (error) {
-        console.error('載入管理員資料失敗:', error);
-        alert('載入失敗: ' + error.message);
-        window.location.href = '/2index.html';
+        console.error('檢查權限失敗:', error);
+        window.location.href = '/2admin_login.html';
       }
     } else {
-      console.log('無用戶登入，重定向到 /2index.html');
-      window.location.href = '/2index.html';
+      console.log('無用戶登入');
+      window.location.href = '/2admin_login.html';
     }
   });
 });
@@ -120,7 +115,7 @@ logoutBtn.addEventListener('click', async () => {
   try {
     await signOut(auth);
     console.log('登出成功');
-    window.location.href = '/2index.html';
+    window.location.href = '/2admin_login.html';
   } catch (error) {
     console.error('登出失敗:', error);
     alert('登出失敗: ' + error.message);
@@ -487,8 +482,7 @@ export async function loadIPWhitelist() {
         <div class="flex space-x-2">
           <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
           <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
-        </div>
-      `;
+        `;
       ipList.appendChild(li);
     });
 
