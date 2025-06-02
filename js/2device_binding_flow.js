@@ -4,25 +4,25 @@ import { collection, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebas
 // 多語言翻譯
 const translations = {
   zh: {
-    title: '員工打卡系統登入 (2)',
+    title: '員工打卡系統 (2)',
     emailLabel: '電子郵件',
     emailPlaceholder: '請輸入您的電子郵件',
     passwordLabel: '密碼',
-    passwordPlaceholder: '請輸入密碼',
-    loginBtn: '登入',
+    passwordPlaceholder: '請輸入您的密碼',
+    loginBtn: '輸入',
     forgotPassword: '忘記密碼？',
-    noAccount: '還沒有帳號？',
+    noAccount: '尚未有帳號？',
     registerBtn: '註冊新帳號',
     registerTitle: '註冊新帳號',
     registerSubmit: '提交註冊',
-    backToLogin: '返回登入',
+    backToLogin: '返回輸入',
     emptyFields: '請輸入電子郵件、密碼和姓名',
     emptyEmail: '請輸入電子郵件',
-    loginFailed: '登入失敗',
-    passwordResetSent: '密碼重設郵件已發送',
+    loginFailed: '輸入失敗',
+    passwordResetSent: '密碼重設輸入已發送',
     passwordResetFailed: '密碼重設失敗',
     registerFailed: '註冊失敗',
-    registerSuccess: '註冊成功，請登入',
+    registerSuccess: '註冊成功，請輸入',
     nameLabel: '姓名',
     namePlaceholder: '請輸入您的姓名',
     checkinTitle: '員工打卡系統 (2)',
@@ -31,15 +31,16 @@ const translations = {
     locationOption: '宏匯',
     checkinBtn: '上班打卡',
     checkoutBtn: '下班打卡',
-    logoutBtn: '登出',
+    logoutBtn: '登記',
     emptyLocation: '請選擇地點',
     ipError: '無法獲取您的 IP 地址，請檢查網絡',
-    wifiError: '請連接餐廳WIFI',
+    wifiError: '請連接到餐廳WIFI',
     checkinSuccess: '上班打卡成功',
     checkoutSuccess: '下班打卡成功',
     checkinFailed: '打卡失敗',
     logoutFailed: '登出失敗',
-    nameNotFound: '未找到註冊姓名，請聯繫管理員'
+    nameNotFound: '未找到註冊姓名，請聯繫管理員',
+    error: '打卡失敗'
   },
   vi: {
     title: 'Đăng nhập hệ thống chấm công nhân viên (2)',
@@ -49,10 +50,10 @@ const translations = {
     passwordPlaceholder: 'Vui lòng nhập mật khẩu',
     loginBtn: 'Đăng nhập',
     forgotPassword: 'Quên mật khẩu?',
-    noAccount: 'Chưa có tài khoản?',
+    noAccountLabel: 'Chưa có tài khoản? ',
     registerBtn: 'Đăng ký tài khoản mới',
-    registerTitle: 'Đăng ký tài khoản mới',
-    registerSubmit: 'Gửi đăng ký',
+    registerTitle: 'Ký tài khoản mới',
+    registerSubmit: 'Gửi ký',
     backToLogin: 'Quay lại đăng nhập',
     emptyFields: 'Vui lòng nhập email, mật khẩu và tên',
     emptyEmail: 'Vui lòng nhập email',
@@ -77,7 +78,8 @@ const translations = {
     checkoutSuccess: 'Chấm công kết thúc thành công',
     checkinFailed: 'Chấm công thất bại',
     logoutFailed: 'Đăng xuất thất bại',
-    nameNotFound: 'Không tìm thấy tên đã đăng ký, vui lòng liên hệ quản trị viên'
+    nameNotFound: 'Không tìm thấy tên đã đăng ký, vui lòng liên hệ quản trị viên',
+    error: 'Chấm công thất bại'
   },
   en: {
     title: 'Employee Check-in System Login (2)',
@@ -115,7 +117,8 @@ const translations = {
     checkoutSuccess: 'Check-out successful',
     checkinFailed: 'Check-in failed',
     logoutFailed: 'Logout failed',
-    nameNotFound: 'Registered name not found, please contact the administrator'
+    nameNotFound: 'Registered name not found, please contact the administrator',
+    error: 'Check-in failed'
   }
 };
 
@@ -336,7 +339,7 @@ export function showForgotPasswordForm(auth) {
 }
 
 export async function generateDeviceFingerprint() {
-  // 獲取使用者的設備信息
+  // 獲取使用者的設備資訊
   const parser = new UAParser();
   const result = parser.getResult();
   
