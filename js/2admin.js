@@ -127,14 +127,44 @@ addIpBtn.addEventListener('click', async () => {
   }
 });
 
-// 解析時間戳（支援字串格式）
+// 解析時間戳（支援多種格式）
 function parseTimestamp(timestamp) {
   if (typeof timestamp === 'number') return timestamp;
+  if (typeof timestamp !== 'string') {
+    console.error('無效的 timestamp 類型:', timestamp);
+    return 0;
+  }
+
   try {
-    const [date, time] = timestamp.split(' ');
-    const [year, month, day] = date.split('/').map(Number);
-    const [hour, minute, second] = time.split(':').map(Number);
-    return new Date(year, month - 1, day, hour, minute, second).getTime();
+    // 處理 ISO 格式（例如 "2025-06-02T07:48:58.000Z"）
+    if (timestamp.includes('T')) {
+      return new Date(timestamp).getTime();
+    }
+
+    // 處理 "YYYY/M/D 上午H:mm:ss" 或 "YYYY/M/D 下午H:mm:ss"
+    let datePart, timePart, isPM = false;
+    if (timestamp.includes('上午') || timestamp.includes('下午')) {
+      isPM = timestamp.includes('下午');
+      [datePart, timePart] = timestamp.replace(/上午|下午/, '').trim().split(' ');
+    } else {
+      [datePart, timePart] = timestamp.split(' ');
+    }
+
+    const [year, month, day] = datePart.split('/').map(Number);
+    let [hour, minute, second] = timePart.split(':').map(Number);
+
+    // 處理上午/下午（下午加 12 小時，除非是 12 點）
+    if (isPM && hour !== 12) {
+      hour += 12;
+    } else if (!isPM && hour === 12) {
+      hour = 0; // 上午 12 點應為 00:00
+    }
+
+    const date = new Date(year, month - 1, day, hour, minute, second);
+    if (isNaN(date.getTime())) {
+      throw new Error('無效的日期');
+    }
+    return date.getTime();
   } catch (error) {
     console.error('解析 timestamp 失敗:', timestamp, error);
     return 0;
