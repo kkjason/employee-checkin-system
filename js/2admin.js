@@ -203,110 +203,125 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   console.log(`當前篩選條件 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}, 模式: ${viewMode}`);
 
   try {
-    let q = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
-
-    // 應用篩選條件
-    if (name) q = query(q, where('name', '==', name));
-    if (location) q = query(q, where('location', '==', location));
-    if (startDate) q = query(q, where('timestamp', '>=', startDate));
-    if (endDate) q = query(q, where('timestamp', '<=', endDate + ' 23:59:59'));
-
-    // 分頁邏輯
-    if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
-      currentPage++;
-      q = query(q, startAfter(pageDocs[currentPage - 1].lastDoc));
-    } else if (direction === 'prev' && currentPage > 0) {
-      currentPage--;
-      if (currentPage === 0) {
-        q = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
-        if (name) q = query(q, where('name', '==', name));
-        if (location) q = query(q, where('location', '==', location));
-        if (startDate) q = query(q, where('timestamp', '>=', startDate));
-        if (endDate) q = query(q, where('timestamp', '<=', endDate + ' 23:59:59'));
-      } else {
-        q = query(q, endBefore(pageDocs[currentPage].firstDoc));
-      }
-    }
-
-    q = query(q, limit(20));
-
-    const querySnapshot = await getDocs(q);
     let records = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      data.timestamp = parseTimestamp(data.timestamp); // 解析 timestamp
-      records.push({ id: doc.id, ...data });
-    });
 
-    console.log('原始記錄:', records);
+    if (viewMode === 'raw') {
+      // 原始模式：使用分頁查詢
+      let q = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
 
-    if (records.length > 0) {
-      pageDocs[currentPage] = {
-        firstDoc: querySnapshot.docs[0],
-        lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1]
-      };
-      console.log(`加載 ${records.length} 條記錄`);
+      // 應用篩選條件
+      if (name) q = query(q, where('name', '==', name));
+      if (location) q = query(q, where('location', '==', location));
+      if (startDate) q = query(q, where('timestamp', '>=', startDate));
+      if (endDate) q = query(q, where('timestamp', '<=', endDate + ' 23:59:59'));
+
+      // 分頁邏輯
+      if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
+        currentPage++;
+        q = query(q, startAfter(pageDocs[currentPage - 1].lastDoc));
+      } else if (direction === 'prev' && currentPage > 0) {
+        currentPage--;
+        if (currentPage === 0) {
+          q = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
+          if (name) q = query(q, where('name', '==', name));
+          if (location) q = query(q, where('location', '==', location));
+          if (startDate) q = query(q, where('timestamp', '>=', startDate));
+          if (endDate) q = query(q, where('timestamp', '<=', endDate + ' 23:59:59'));
+        } else {
+          q = query(q, endBefore(pageDocs[currentPage].firstDoc));
+        }
+      }
+
+      q = query(q, limit(20));
+
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        data.timestamp = parseTimestamp(data.timestamp);
+        records.push({ id: doc.id, ...data });
+      });
+
+      if (records.length > 0) {
+        pageDocs[currentPage] = {
+          firstDoc: querySnapshot.docs[0],
+          lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1]
+        };
+        console.log(`加載 ${records.length} 條記錄`);
+      } else {
+        pageDocs[currentPage] = { firstDoc: null, lastDoc: null };
+        console.warn('沒有找到記錄');
+      }
     } else {
-      pageDocs[currentPage] = { firstDoc: null, lastDoc: null };
-      console.warn('沒有找到記錄');
+      // 整合模式：查詢所有符合條件的紀錄
+      let q = query(collection(db, '2checkins'), orderBy('timestamp', 'asc'));
+      if (name) q = query(q, where('name', '==', name));
+      if (location) q = query(q, where('location', '==', location));
+      if (startDate) q = query(q, where('timestamp', '>=', startDate));
+      if (endDate) q = query(q, where('timestamp', '<=', endDate + ' 23:59:59'));
+
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        data.timestamp = parseTimestamp(data.timestamp);
+        records.push({ id: doc.id, ...data });
+      });
+      console.log(`整合模式加載 ${records.length} 條記錄`);
     }
 
     let displayRecords = [];
     let totalRecords = 0;
 
     if (viewMode === 'consolidated') {
-      // 整合紀錄
-      const consolidatedRecords = {};
+      // 整合紀錄：按姓名和地點分組，配對 checkin 和 checkout
+      const groupedRecords = {};
       records.forEach(record => {
-        const date = formatDate(record.timestamp);
-        const key = `${record.name}_${date}`;
-        if (!consolidatedRecords[key]) {
-          consolidatedRecords[key] = {
-            name: record.name,
-            location: record.location,
-            checkin: null,
-            checkout: null
-          };
+        const key = `${record.name}_${record.location}`;
+        if (!groupedRecords[key]) {
+          groupedRecords[key] = [];
         }
-        if (record.type === 'checkin') {
-          if (!consolidatedRecords[key].checkin || record.timestamp < consolidatedRecords[key].checkin.timestamp) {
-            consolidatedRecords[key].checkin = { timestamp: record.timestamp, device: record.device || '-' };
+        groupedRecords[key].push(record);
+      });
+
+      const consolidatedRecords = [];
+      Object.entries(groupedRecords).forEach(([key, records]) => {
+        // 按時間排序
+        records.sort((a, b) => a.timestamp - b.timestamp);
+
+        let i = 0;
+        while (i < records.length) {
+          const record = { name: records[i].name, location: records[i].location, checkin: null, checkout: null };
+
+          if (records[i].type === 'checkin') {
+            record.checkin = { timestamp: records[i].timestamp, device: records[i].device || '-' };
+            // 尋找下一個 checkout
+            let j = i + 1;
+            while (j < records.length && records[j].type !== 'checkout') {
+              j++;
+            }
+            if (j < records.length) {
+              record.checkout = { timestamp: records[j].timestamp, device: records[j].device || '-' };
+              i = j++ // 跳過已配對的 checkout
+            } else {
+              i++; // 無配對 checkout，保留單獨立 checkin
+            }
+          } else {
+            // 開頭為 checkout，作為獨立紀錄
+            record.checkout = { timestamp: records[i].timestamp, device: records[i].device || '-' };
+            i++;
           }
-        } else if (record.type === 'checkout') {
-          if (!consolidatedRecords[key].checkout || record.timestamp > consolidatedRecords[key].checkout.timestamp) {
-            consolidatedRecords[key].checkout = { timestamp: record.timestamp, device: record.device || '-' };
-          }
+          consolidatedRecords.push(record);
         }
       });
 
-      displayRecords = Object.values(consolidatedRecords).sort((a, b) => {
-        const dateA = new Date(a.checkin ? a.checkin.timestamp : a.checkout.timestamp).getTime();
-        const dateB = new Date(b.checkin ? b.checkin.timestamp : b.checkout.timestamp).getTime();
-        return dateB - dateA;
+      // 按 checkin 或 checkout 時間降序排序
+      displayRecords = consolidatedRecords.sort((a, b) => {
+        const timeA = a.checkin ? a.checkinTime.timestamp : a.checkout.timestamp;
+        const timeB = b.checkin ? b.checkinTime.timestamp : b.checkoutTime;
+        return timeB - timeA;
       });
 
+      totalRecords = consolidatedRecords.length;
       console.log('整合後記錄:', displayRecords);
-
-      // 計算總記錄數（整合模式）
-      let totalQuery = query(collection(db, '2checkins'));
-      if (name) totalQuery = query(totalQuery, where('name', '==', name));
-      if (location) totalQuery = query(totalQuery, where('location', '==', location));
-      if (startDate) totalQuery = query(totalQuery, where('timestamp', '>=', startDate));
-      if (endDate) totalQuery = query(totalQuery, where('timestamp', '<=', endDate + ' 23:59:59'));
-      const totalSnapshot = await getDocs(totalQuery);
-      const tempRecords = [];
-      totalSnapshot.forEach(doc => {
-        const data = doc.data();
-        data.timestamp = parseTimestamp(data.timestamp);
-        tempRecords.push({ id: doc.id, ...data });
-      });
-      const tempGrouped = {};
-      tempRecords.forEach(record => {
-        const date = formatDate(record.timestamp);
-        const key = `${record.name}_${date}`;
-        if (!tempGrouped[key]) tempGrouped[key] = true;
-      });
-      totalRecords = Object.keys(tempGrouped).length;
     } else {
       // 原始模式
       displayRecords = records;
@@ -349,13 +364,18 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     });
 
     // 更新分頁資訊
-    recordStart.textContent = (currentPage * 20) + 1;
-    recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
+    if (viewMode === 'raw') {
+      recordStart.textContent = (currentPage * 20) + 1;
+      recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
+    } else {
+      recordStart.textContent = 1;
+      recordEnd.textContent = totalRecords;
+    }
     recordTotal.textContent = totalRecords;
 
-    // 控制分頁按鈕
-    prevPageBtn.disabled = currentPage === 0;
-    nextPageBtn.disabled = displayRecords.length < 20 || !pageDocs[currentPage]?.lastDoc;
+    // 控制分頁按鈕（僅限原始模式）
+    prevPageBtn.disabled = viewMode === 'consolidated' || currentPage === 0;
+    nextPageBtn.disabled = viewMode === 'consolidated' || (viewMode === 'raw' && records.length < 20) || !pageDocs[currentPage]?.lastDoc;
 
     // 匯出 Excel 按鈕
     exportExcelBtn.removeEventListener('click', exportToExcel);
@@ -365,7 +385,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     console.error('載入打卡紀錄失敗:', error);
     let errorMessage = error.message;
     if (error.code === 'failed-precondition' && error.message.includes('requires an index')) {
-      errorMessage = `查詢需要索引，請在 Firebase 控制台中創建索引：${error.message.match(/https:\/\/[^\s]+/)[0]}`;
+      errorMessage = `查詢需要索引，請在 Firebase 控制台中創建索引：${error.message.match(/https:\/\/[^\s]+/)?.[0] || error.message}`;
     } else if (error.code === 'permission-denied') {
       errorMessage = '權限不足，請確認您是管理員';
     }
@@ -453,7 +473,7 @@ export async function loadIPWhitelist() {
     });
   } catch (error) {
     console.error('載入 IP 白名單失敗:', error);
-    let errorMessage = error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : `載入失敗: ${error.message}`;
+    let errorMessage = error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : error.message;
     ipList.innerHTML = `<li class="text-red-600">${errorMessage}</li>`;
   }
 }
