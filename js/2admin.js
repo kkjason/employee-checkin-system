@@ -198,7 +198,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   const recordEnd = document.getElementById('record-end');
   const recordTotal = document.getElementById('record-total');
 
-  checkinRecords.innerHTML = '<tr><td colspan="4" class="py-3 text-center">載入中...</td></tr>';
+  checkinRecords.innerHTML = '<tr><td colspan="5" class="py-3 text-center">載入中...</td></tr>';
 
   // 重置分頁
   if (
@@ -312,10 +312,11 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     let totalRecords = 0;
 
     if (viewMode === 'consolidated') {
-      // 整合紀錄：按姓名和地點分組，配對時間
+      // 整合模式：按姓名、地點、日期分組
       const groupedRecords = {};
       records.forEach(record => {
-        const key = `${record.name}_${record.location}_${record.id}`;
+        const date = formatDate(record.timestamp);
+        const key = `${record.name}_${record.location}_${date}`;
         if (!groupedRecords[key]) {
           groupedRecords[key] = [];
         }
@@ -323,22 +324,23 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       });
 
       const consolidatedRecords = [];
-      Object.entries(groupedRecords).forEach(([_, records]) => {
+      Object.entries(groupedRecords).forEach(([key, records]) => {
         // 按時間排序
         records.sort((a, b) => a.timestamp - b.timestamp);
 
         let i = 0;
         while (i < records.length) {
-          const record = { name: records[i].name, location: records[i].location, checkin: null, checkout: null };
+          const [name, location, date] = key.split('_');
+          const record = { name, location, date, checkin: null, checkout: null };
 
           if (records[i].type === 'checkin') {
             record.checkin = { timestamp: records[i].timestamp, device: records[i].device || '-' };
-            // 尋找下一個 checkout
+            // 尋找同一天的下一個 checkout
             let j = i + 1;
             while (j < records.length && records[j].type !== 'checkout') {
               j++;
             }
-            if (j < records.length) {
+            if (j < records.length && formatDate(records[j].timestamp) === date) {
               record.checkout = { timestamp: records[j].timestamp, device: records[j].device || '-' };
               i = j + 1; // 跳過已配對的 checkout
             } else {
@@ -353,7 +355,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         }
       });
 
-      // 按 checkin 或 checkout 時間降序排序
+      // 按日期降序排序
       displayRecords = consolidatedRecords.sort((a, b) => {
         const timeA = a.checkin ? a.checkin.timestamp : (a.checkout ? a.checkout.timestamp : 0);
         const timeB = b.checkin ? b.checkin.timestamp : (b.checkout ? b.checkout.timestamp : 0);
@@ -377,11 +379,12 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     displayRecords.forEach(record => {
       const row = document.createElement('tr');
       if (viewMode === 'consolidated') {
-        const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : `-`;
+        const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-';
         const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
           <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${record.date}</td>
           <td class="py-3 px-4 border-b">${checkinTime}</td>
           <td class="py-3 px-4 border-b">${checkoutTime}</td>
         `;
@@ -391,6 +394,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
           <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${formatDate(record.timestamp)}</td>
           <td class="py-3 px-4 border-b">${checkinTime}</td>
           <td class="py-3 px-4 border-b">${checkoutTime}</td>
         `;
@@ -426,7 +430,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       window.location.assign('/2admin_login.html');
       return;
     }
-    checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${errorMessage}</td></tr>`;
+    checkinRecords.innerHTML = `<tr><td colspan="5" class="py-3 px-4 text-red-600 text-center">載入失敗: ${errorMessage}</td></tr>`;
   }
 }
 
@@ -440,7 +444,7 @@ function exportToExcel() {
         return {
           姓名: record.name,
           地點: record.location,
-          日期: formatDate(record.checkin ? record.checkin.timestamp : record.checkout.timestamp),
+          日期: record.date,
           上班時間: record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
           上班設備: record.checkin ? record.checkin.device : '-',
           下班時間: record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
@@ -450,6 +454,7 @@ function exportToExcel() {
         return {
           姓名: record.name,
           地點: record.location,
+          日期: formatDate(record.timestamp),
           上班時間: record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
           下班時間: record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
           設備: record.device || '-'
