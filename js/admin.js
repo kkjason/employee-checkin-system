@@ -452,7 +452,7 @@ async function loadIPWhitelist() {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
         const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
-       if sprites && newIp && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(newIp) {
+       if (newIp && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(newIp)) {
           try {
             await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
             loadIPWhitelist();
