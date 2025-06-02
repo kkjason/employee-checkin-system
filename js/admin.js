@@ -226,14 +226,13 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
 
       // 更新分頁資料
       if (records.length > 0) {
-        pageDocs[currentPage] = { firstDoc, lastDoc };
-        if (direction === 'next') {
+        if (direction === 'next' && currentPage < pageDocs.length) {
           currentPage++;
-          pageDocs[currentPage] = { firstDoc, lastDoc };
         } else if (direction === 'prev' && currentPage > 0) {
           currentPage--;
         }
-        console.log(`當前頁數: ${currentPage}, pageDocs:`, pageDocs);
+        pageDocs[currentPage] = { firstDoc, lastDoc };
+        console.log(`當前頁數: ${currentPage}, pageDocs[${currentPage}]:`, pageDocs[currentPage]);
       }
     } else {
       // 整合模式：查詢所有符合條件的紀錄
@@ -426,7 +425,7 @@ async function loadIPWhitelist() {
         <span class="flex-1">${ip}</span>
         <div class="flex space-x-2">
           <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
-          <button class="text-red-600 hover:text-red-700 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
+          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
         </div>
       `;
       ipList.appendChild(li);
@@ -439,8 +438,8 @@ async function loadIPWhitelist() {
           await deleteDoc(doc(db, 'whitelist', id));
           loadIPWhitelist();
         } catch (error) {
-          console.error('删除 IP 失敗:', error);
-          alert('删除失敗: ' + error.message);
+          console.error('刪除 IP 失敗:', error);
+          alert('刪除失敗: ' + error.message);
         }
       });
     });
