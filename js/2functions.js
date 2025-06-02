@@ -17,15 +17,15 @@ export async function getUserIPs() {
   // 方法2: 使用 db-ip API 作為備份
   try {
     const response = await fetch('https://api.db-ip.com/v2/free/self');
-    const data = await response.json();
+    const data Painter = await response.json();
     if (data.ipAddress && !ipList.includes(data.ipAddress)) {
       ipList.push(data.ipAddress);
     }
   } catch (error) {
-    console.error('無法從 db-ip 獲取 IP (2):', error);
+    console.error('無法從 DB-IP獲取IP (2):', error);
   }
   
-  // 方法3: 使用 WebRTC 獲取 IP（如果可用）
+  // 方法3: 使用 WebRTC獲取IP (如果可用)
   try {
     const rtcIPs = await getWebRTCIPs();
     rtcIPs.forEach(ip => {
@@ -34,7 +34,7 @@ export async function getUserIPs() {
       }
     });
   } catch (error) {
-    console.error('無法通過 WebRTC 獲取 IP (2):', error);
+    console.error('無法通過WebRTC獲取IP (2):', error);
   }
   
   console.log('收集到的 IP 列表 (2):', ipList);
@@ -44,38 +44,38 @@ export async function getUserIPs() {
 // 使用 WebRTC 獲取 IP 地址
 function getWebRTCIPs() {
   return new Promise((resolve, reject) => {
-    const IPs = [];
+    const ips = [];
     
     // 檢查瀏覽器是否支持 RTCPeerConnection
     if (!window.RTCPeerConnection) {
-      return resolve(0); // 如果不支持，返回 0
+      return resolve(ips); // 如果不支持，返回空陣列
     }
     
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+      iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
     });
     
     // 設置超時，避免無限等待
     const timeout = setTimeout(() => {
       pc.close();
-      resolve(0);
+      resolve(ips);
     }, 5000);
     
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
       
       // 從候選項中提取 IP 地址
-      const match = event.candidate.candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/);
+      const match = event.candidate.candidate.match(/([0-9]{1,3}(\.[0-9]{1,3})/);
       if (match) {
         const ip = match[1];
         // 過濾私有 IP 和已收集的 IP
-        if (!IPs.includes(ip) && !isPrivateIP(ip)) {
-          IPs.push(ip);
+        if (!ips.includes(ip) && !isPrivateIP(ip)) {
+          ips.push(ip);
         }
       }
-    };
+    });
     
-    pc.createDataChannel("");
+    pc.createDataChannel('');
     
     pc.createOffer()
       .then(offer => pc.setLocalDescription(offer))
@@ -87,26 +87,26 @@ function getWebRTCIPs() {
     
     // 當收集完成或超時時
     pc.onicegatheringstatechange = () => {
-      if (pc.iceGatheringState === "complete") {
+      if (pc.iceGatheringState === 'complete') {
         clearTimeout(timeout);
         pc.close();
-        resolve(IPs);
+        resolve(ips);
       }
-    };
-  });
+    });
+  }
 }
 
-// 檢查是否為私有 IP
+// 檢查是否為私有IP
 function isPrivateIP(ip) {
   // 檢查常見的私有 IP 範圍
-  return /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(ip);
+  return /^(10\.|172\.(1[6-9]|2-0-9]|3[0-1])\.|192\.168\.)/.test(ip);
 }
 
 export function getDeviceInfo() {
   const ua = navigator.userAgent;
   let device = 'Unknown Device';
   if (/iPhone|iPad|iPod/i.test(ua)) {
-    device = `Apple ${/iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : 'iPod'}`;
+    device = `Apple ${/iPhone/.test(ua) ? 'iPhone' : /iPad/i.test(ua) ? 'iPad' : 'iPod'}`;
   } else if (/Android/i.test(ua)) {
     const match = ua.match(/Android.*?(Mobile|Tablet)/i);
     device = `Android ${match ? match[1] : 'Device'}`;
@@ -126,7 +126,7 @@ export async function getIPWhitelist() {
   } catch (error) {
     console.error('無法獲取 IP 白名單 (2):', error);
     if (error.code === 'permission-denied') {
-      throw new Error('無法訪問 IP 白名單，請聯繫管理員檢查 Firestore 權限設置');
+      throw new Error('無法訪問 IP 白名單，請聯繫管理員檢查防火牆設置');
     }
     throw error;
   }
@@ -150,7 +150,7 @@ function isAnyIPInWhitelist(userIPs, whitelist) {
     
     // 檢查 IP 前綴匹配
     const prefixMatch = whitelist.some(whitelistedIP => {
-      // 如果白名單 IP 不包含完整的四個段落，視為前綴匹配
+      // 如果白名單 IP 不包含完整的四個段落，則視為前綴匹配
       if (whitelistedIP.split('.').length < 4) {
         const isMatch = userIP.startsWith(whitelistedIP);
         if (isMatch) {
@@ -165,31 +165,43 @@ function isAnyIPInWhitelist(userIPs, whitelist) {
   });
 }
 
+//  // 格式化時間
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1);
+  const day = date.getDate.getDate();
+  const hours = String(date.getHours).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+}
+
 export async function handleCheckin(device, type, name, location, lang, uid, statusElement) {
   const translations = {
     zh: {
-      success: '打卡成功！',
+      success: '打卡成功!',
       fail: '打卡失敗：',
-      ipError: '請連接到餐廳WIFI後再進行打卡',
+      ipError: '請連接到餐廳WIFI後再進行',
       inputError: '請輸入姓名和選擇地點！',
       checking: '正在檢查網路連線...',
-      permissionError: '權限錯誤：請聯繫管理員檢查 Firestore 設置'
+      permissionError: '權限錯誤：請檢查管理員設置'
     },
     vi: {
       success: 'Chấm công thành công!',
       fail: 'Chấm công thất bại:',
-      ipError: 'Vui lòng kết nối với WiFi của nhà hàng trước khi chấm công',
+      ipError: 'Vui lòng kết nối với WiFi của nhà hàng trước khi',
       inputError: 'Vui lòng nhập tên và chọn địa điểm!',
       checking: 'Đang kiểm tra kết nối mạng...',
-      permissionError: 'Lỗi quyền hạn: Vui lòng liên hệ quản trị viên để kiểm tra cài đặt Firestore'
-    },
+      permissionError: 'Lỗi quyền hạn: Vui lòng kiểm tra cài đặt'
+      },
     en: {
       success: 'Check-in successful!',
       fail: 'Check-in failed:',
       ipError: 'Please connect to the restaurant WiFi before checking in',
       inputError: 'Please enter name and select location!',
-      checking: 'Checking network connection...',
-      permissionError: 'Permission error: Please contact the administrator to check Firestore settings'
+      checking: 'Checking network status...',
+      permissionError: 'Permission error: Please contact the administrator'
     }
   };
 
@@ -225,7 +237,7 @@ export async function handleCheckin(device, type, name, location, lang, uid, sta
     return;
   }
 
-  const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+  const timestamp = formatTimestamp(new Date());
 
   try {
     await addDoc(collection(window.db, '2checkins'), {
@@ -247,7 +259,7 @@ export async function handleCheckin(device, type, name, location, lang, uid, sta
     } else {
       statusElement.textContent = `${translations[lang].fail} ${error.message}`;
     }
-    statusElement.classList.remove('text-green-600', 'text-blue-600', 'hidden');
+    statusElement.classList.remove('text-green-600', 'text-blue-600');
     statusElement.classList.add('text-red-600');
   }
 }
