@@ -84,16 +84,33 @@ consolidatedRecordsBtn.addEventListener('click', () => {
 
 // 等待 DOM 載入完成
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('開始檢查身份驗證狀態');
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
-      document.getElementById('admin-container').classList.remove('hidden');
-      ipManagement.classList.remove('hidden');
-      checkinManagement.classList.add('hidden');
-      await loadIPWhitelist();
+      console.log('用戶已登入，UID:', user.uid, '電子郵件:', user.email);
+      try {
+        // 可選：檢查是否為管理員（需要自訂聲明或 Firestore 查詢）
+        // 示例：假設管理員 UID 儲存在 Firestore 的 admins 集合
+        /*
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        if (!adminDoc.exists()) {
+          console.log('用戶非管理員，重定向到 /2index.html');
+          window.location.href = '/2index.html';
+          return;
+        }
+        */
+        document.getElementById('admin-container').classList.remove('hidden');
+        ipManagement.classList.remove('hidden');
+        checkinManagement.classList.add('hidden');
+        await loadIPWhitelist();
+      } catch (error) {
+        console.error('載入管理員資料失敗:', error);
+        alert('載入失敗: ' + error.message);
+        window.location.href = '/2index.html';
+      }
     } else {
-      console.log('無用戶登入');
-      window.location.href = '/index.html';
+      console.log('無用戶登入，重定向到 /2index.html');
+      window.location.href = '/2index.html';
     }
   });
 });
@@ -103,7 +120,7 @@ logoutBtn.addEventListener('click', async () => {
   try {
     await signOut(auth);
     console.log('登出成功');
-    window.location.href = '/index.html';
+    window.location.href = '/2index.html';
   } catch (error) {
     console.error('登出失敗:', error);
     alert('登出失敗: ' + error.message);
