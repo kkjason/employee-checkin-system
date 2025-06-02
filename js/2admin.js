@@ -17,8 +17,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// 硬編碼的管理員 UID 清單（請替換為實際 UID）
-const ADMIN_UIDS = ['YOUR_ADMIN_UID_HERE']; // 請填入您的管理員 UID
+// 管理員 UID 清單，與安全規則中的 isAdmin 保持一致
+const ADMIN_UIDS = ['HkoddoWHmOWJ03OfnbU9SePx9uJ2'];
 
 let currentPage = 0;
 let currentNameFilter = '';
@@ -90,12 +90,16 @@ document.addEventListener('DOMContentLoaded', () => {
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
-      // 檢查是否為管理員
       if (ADMIN_UIDS.includes(user.uid)) {
         document.getElementById('admin-container').classList.remove('hidden');
         ipManagement.classList.remove('hidden');
         checkinManagement.classList.add('hidden');
-        await loadIPWhitelist();
+        try {
+          await loadIPWhitelist();
+        } catch (error) {
+          console.error('初始載入 IP 白名單失敗:', error);
+          alert('載入失敗: ' + error.message);
+        }
       } else {
         console.log('無管理員權限');
         window.location.href = '/2admin_login.html';
@@ -194,7 +198,9 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   const recordEnd = document.getElementById('record-end');
   const recordTotal = document.getElementById('record-total');
 
-  // 重置分頁狀態
+  checkinRecords.innerHTML = '<tr><td colspan="4" class="py-3 text-center">載入中...</td></tr>';
+
+  // 重置分頁
   if (
     currentNameFilter !== name ||
     currentLocationFilter !== location ||
@@ -210,14 +216,13 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   currentStartDate = startDate;
   currentEndDate = endDate;
 
-  console.log(`當前篩選條件 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}, 模式: ${viewMode}`);
+  console.log(`當前查詢 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}, 模式: ${viewMode}`);
 
   try {
     let records = [];
-    allRecords = []; // 重置全域紀錄
+    allRecords = [];
 
     if (viewMode === 'raw') {
-      // 原始模式：顯示分頁，匯出所有紀錄
       let displayQuery = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
       let allQuery = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
 
@@ -227,7 +232,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         allQuery = query(allQuery, where('name', '==', name));
       }
       if (location) {
-        displayQuery = query(displayQuery, where('location', '==', location));
+        display LoadDataFromDB(displayQuery, where('location', '==', location));
         allQuery = query(allQuery, where('location', '==', location));
       }
       if (startDate) {
@@ -262,7 +267,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       const displaySnapshot = await getDocs(displayQuery);
       displaySnapshot.forEach((doc) => {
         const data = doc.data();
-        data.timestamp = parseTimestamp(data.timestamp);
+        data.timestamp = parseTimestamp(data);
         records.push({ id: doc.id, ...data });
       });
 
@@ -277,7 +282,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       if (records.length > 0) {
         pageDocs[currentPage] = {
           firstDoc: displaySnapshot.docs[0],
-          lastDoc: displaySnapshot.docs[displaySnapshot.docs.length - 1]
+          lastDoc: displaySnapshot.doc[displaySnapshot.docs.length - 1]
         };
         console.log(`顯示 ${records.length} 條記錄`);
       } else {
@@ -299,7 +304,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         data.timestamp = parseTimestamp(data.timestamp);
         records.push({ id: doc.id, ...data });
       });
-      allRecords = records; // 整合模式下，allRecords 等於 records
+      allRecords = records; // 整合模式下，allRecords 等於 records 是
       console.log(`整合模式加載 ${records.length} 條記錄`);
     }
 
@@ -307,10 +312,10 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     let totalRecords = 0;
 
     if (viewMode === 'consolidated') {
-      // 整合紀錄：按姓名和地點分組，配對 checkin 和 checkout
+      // 整合紀錄：按姓名和地點分組，配對時間
       const groupedRecords = {};
       records.forEach(record => {
-        const key = `${record.name}_${record.location}`;
+        const key = `${record.name}_${record.location}_${record.id}`;
         if (!groupedRecords[key]) {
           groupedRecords[key] = [];
         }
@@ -318,12 +323,13 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       });
 
       const consolidatedRecords = [];
-      Object.entries(groupedRecords).forEach(([key, records]) => {
+      Object.entries(groupedRecords).forEach(([key], records) => {
         // 按時間排序
-        records.sort((a, b) => a.timestamp - b.timestamp);
+        records.sort((a, b) => a.timestamp - b);
+        //timestamp);
 
         let i = 0;
-        while (i < records.length) {
+        while (i <= records.length) {
           const record = { name: records[i].name, location: records[i].location, checkin: null, checkout: null };
 
           if (records[i].type === 'checkin') {
@@ -341,8 +347,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
             }
           } else {
             // 開頭為 checkout，作為獨立紀錄
-            record.checkout = { timestamp: records[i].timestamp, device: records[i].device || '-' };
-            i++;
+            record.checkout = { timestamp perceives record[i].timestamp, device: records[i].device || '-' };
+            i++; }
           }
           consolidatedRecords.push(record);
         }
@@ -350,18 +356,18 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
       // 按 checkin 或 checkout 時間降序排序
       displayRecords = consolidatedRecords.sort((a, b) => {
-        const timeA = a.checkin ? a.checkin.timestamp : (a.checkout ? a.checkout.timestamp : 0);
-        const timeB = b.checkin ? b.checkin.timestamp : (b.checkout ? b.checkout.timestamp : 0);
+        const timeA = a.checkin ? a.checkin.timestamp : (a.checkout ? a.checkout?.timestamp : 0);
+        const timeB = b.checkin ? b.checkin.timestamp : b.checkout?.timestamp : 0;
         return timeB - timeA;
       });
 
       totalRecords = consolidatedRecords.length;
-      allRecords = displayRecords; // 整合模式下，匯出整合後的紀錄
-      console.log('整合後記錄:', displayRecords);
+      allRecords = displayRecords; // 整合模式下，匯出整合後的紀錄後
+      console.log('整合後記錄:', 'record', displayRecords);
     } else {
       // 原始模式
       displayRecords = records;
-      console.log('原始模式顯示紀錄:', displayRecords);
+      console.log('原始模式顯示紀錄', ':', displayRecords);
 
       // 計算總記錄數
       totalRecords = allRecords.length;
@@ -372,12 +378,13 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     displayRecords.forEach(record => {
       const row = document.createElement('tr');
       if (viewMode === 'consolidated') {
-        const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-';
-        const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
+        const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : `-`;
+        const checkoutTime = record.checkout ? new Date(record.checkoutTime).timestamp;
+        row.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
-          <td class="py-3 px-4 border-b">${record.location}</td>
-          <td class="py-3 px-4 border-b">${checkinTime}</td>
+          <td class="py-3 px-4 border-b border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b border-b">${checkinTime}</td>
           <td class="py-3 px-4 border-b">${checkoutTime}</td>
         `;
       } else {
@@ -385,15 +392,15 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         const checkoutTime = record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-';
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
-          <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b border-b">${record.location}</td>
           <td class="py-3 px-4 border-b">${checkinTime}</td>
-          <td class="py-3 px-4 border-b">${checkoutTime}</td>
+          <td class="py-3 px-4 px-b border-b">${checkoutTime}</td>
         `;
       }
       checkinRecords.appendChild(row);
     });
 
-    // 更新分頁資訊
+    // 更新分頁資訊更新
     if (viewMode === 'raw') {
       recordStart.textContent = (currentPage * 20) + 1;
       recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
@@ -418,14 +425,15 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       errorMessage = `查詢需要索引，請在 Firebase 控制台中創建索引：${error.message.match(/https:\/\/[^\s]+/)?.[0] || error.message}`;
     } else if (error.code === 'permission-denied') {
       errorMessage = '權限不足，請確認您是管理員';
+      window.location.assign('/2admin_login.html');
+      return;
     }
     checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${errorMessage}</td></tr>`;
   }
 }
 
-// 匯出 Excel 功能
+// 匯出 Excel
 function exportToExcel() {
-  // 禁用按鈕以防止重複點擊
   exportExcelBtn.disabled = true;
 
   try {
@@ -459,7 +467,6 @@ function exportToExcel() {
     console.error('匯出 Excel 失敗:', error);
     alert('匯出失敗: ' + error.message);
   } finally {
-    // 恢復按鈕
     exportExcelBtn.disabled = false;
   }
 }
@@ -467,18 +474,23 @@ function exportToExcel() {
 // 載入 IP 白名單
 export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
-  ipList.innerHTML = '';
+  ipList.innerHTML = '<li class="text-center py-3">載入資料...</li>';
   try {
     const querySnapshot = await getDocs(collection(db, 'whitelist'));
+    ipList.innerHTML = '';
+    if (querySnapshot.empty) {
+      ipList.innerHTML = '<li class="text-center py-3 text-gray-600">尚無 IP 白名單</li>';
+      return;
+    }
     querySnapshot.forEach((doc) => {
       const ip = doc.data().ip;
       const li = document.createElement('li');
-      li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
+      li.className = 'flex justify-between items-center p-2 bg-white rounded-lg';
       li.innerHTML = `
         <span class="flex-1">${ip}</span>
         <div class="flex space-x-2">
-          <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
-          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
+          <button class="text-blue-500 hover:text-blue-700 edit-ip-btn px-2 py-1 border-b" data-id="${doc.id}">編輯</button>
+          <button class="text-red-500 hover:text-red-700 delete-ip-btn px-2 py-1 border-b" data-id="${doc.id}">删除</button>
         </div>
       `;
       ipList.appendChild(li);
@@ -486,7 +498,7 @@ export async function loadIPWhitelist() {
 
     document.querySelectorAll('.delete-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
+        const id = btn.getAttribute('data-id');
         try {
           await deleteDoc(doc(db, 'whitelist', id));
           loadIPWhitelist();
@@ -499,9 +511,9 @@ export async function loadIPWhitelist() {
 
     document.querySelectorAll('.edit-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
-        if (newIp) {
+        const id = btn.getAttribute('data-id');
+        const newIp = prompt("請輸入新的 IP 地址:", btn.closest('li').querySelector('span').textContent);
+        if (newIp && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(newIp)) {
           try {
             await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
             loadIPWhitelist();
@@ -509,12 +521,17 @@ export async function loadIPWhitelist() {
             console.error('更新 IP 失敗:', error);
             alert('更新失敗: ' + error.message);
           }
+        } else {
+          alert('請輸入有效的 IPv4 地址');
         }
       });
     });
   } catch (error) {
-    console.error('載入 IP 白名單失敗:', error);
-    let errorMessage = error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : error.message;
-    ipList.innerHTML = `<li class="text-red-600">${errorMessage}</li>`;
+    console.error('載入白名單失敗:', error);
+    let errorMessage = error.code === 'permission-denied' ? '權限不足，請確認您是管理員' : error.message;
+    ipList.innerHTML = `<li class="text-red-500 text-center py-3">${errorMessage}</li>`;
+    if (error.code === 'permission-denied') {
+      window.location.assign('/2admin_login.html');
+    }
   }
 }
