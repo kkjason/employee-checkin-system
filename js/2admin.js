@@ -300,9 +300,9 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
             }
             if (j < records.length) {
               record.checkout = { timestamp: records[j].timestamp, device: records[j].device || '-' };
-              i = j++ // 跳過已配對的 checkout
+              i = j + 1; // 跳過已配對的 checkout
             } else {
-              i++; // 無配對 checkout，保留單獨立 checkin
+              i++; // 無配對 checkout，保留單獨 checkin
             }
           } else {
             // 開頭為 checkout，作為獨立紀錄
@@ -315,8 +315,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
       // 按 checkin 或 checkout 時間降序排序
       displayRecords = consolidatedRecords.sort((a, b) => {
-        const timeA = a.checkin ? a.checkinTime.timestamp : a.checkout.timestamp;
-        const timeB = b.checkin ? b.checkinTime.timestamp : b.checkoutTime;
+        const timeA = a.checkin ? a.checkin.timestamp : (a.checkout ? a.checkout.timestamp : 0);
+        const timeB = b.checkin ? b.checkin.timestamp : (b.checkout ? b.checkout.timestamp : 0);
         return timeB - timeA;
       });
 
@@ -451,7 +451,7 @@ export async function loadIPWhitelist() {
           loadIPWhitelist();
         } catch (error) {
           console.error('刪除 IP 失敗:', error);
-          alert('刪除失敗: ' + error.message);
+          alert('删除失敗: ' + error.message);
         }
       });
     });
@@ -459,7 +459,7 @@ export async function loadIPWhitelist() {
     document.querySelectorAll('.edit-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
-        const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
+        const newIp = prompt("請輸入新IP 位址:", btn.closest('li').querySelector('span').textContent);
         if (newIp) {
           try {
             await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
@@ -475,5 +475,6 @@ export async function loadIPWhitelist() {
     console.error('載入 IP 白名單失敗:', error);
     let errorMessage = error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : error.message;
     ipList.innerHTML = `<li class="text-red-600">${errorMessage}</li>`;
+    console.log('載入白 IP名');
   }
 }
