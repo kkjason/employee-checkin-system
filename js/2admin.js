@@ -369,8 +369,8 @@ function exportToExcel(records) {
 
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append(ws, ws, 'Checkin Records');
-  XLSX.writeFile(wb, `Checkin_Records_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, '打卡紀錄');
+  XLSX.writeFile(wb, `打卡紀錄_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 // 載入 IP 白名單
@@ -382,47 +382,48 @@ export async function loadIPWhitelist() {
     querySnapshot.forEach((doc) => {
       const ip = doc.data().ip;
       const li = document.createElement('li');
-      li.className = 'flex justify-between items-center p-2 bg-gray-50 border-b';
+      li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
       li.innerHTML = `
-        <span class="flex-1 px-1">${ip}</span>
+        <span class="flex-1">${ip}</span>
         <div class="flex space-x-2">
-          <button class="text-blue-600 hover:text-blue-200 px-2 py-1 border border-blue-600 rounded" data-id="${doc.id}">編輯</button>
-          <button class="text-red-600 hover:text-red-200 px-2 py-1 border border-red-600 rounded" data-id="${doc.id}">刪除</button>
+          <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
+          <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
         </div>
       `;
       ipList.appendChild(li);
     });
 
-    document.querySelectorAll('.delete-btn').forEach(btn => {
+    document.querySelectorAll('.delete-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
         try {
           await deleteDoc(doc(db, 'whitelist', id));
           loadIPWhitelist();
         } catch (error) {
-          console.error('Delete IP failed:', error);
-          alert('Failed to delete IP: ' + error.message);
+          console.error('刪除 IP 失敗:', error);
+          alert('刪除失敗: ' + error.message);
         }
       });
     });
 
-    document.querySelectorAll('.edit-btn').forEach(btn => {
+    document.querySelectorAll('.edit-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
-        const newIp = prompt("Enter new IP address:", btn.closest('li').querySelector('span').textContent);
+        const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
         if (newIp) {
           try {
             await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
             loadIPWhitelist();
           } catch (error) {
-            console.error('Update IP failed:', error);
-            alert('Update failed: ' + error.message);
+            console.error('更新 IP 失敗:', error);
+            alert('更新失敗: ' + error.message);
           }
         }
       });
     });
   } catch (error) {
     console.error('載入 IP 白名單失敗:', error);
-    ipList.innerHTML = `<li class="text-red-600 error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : `載入失敗: ${error.message}`}</li>`;
+    let errorMessage = error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : `載入失敗: ${error.message}`;
+    ipList.innerHTML = `<li class="text-red-600">${errorMessage}</li>`;
   }
 }
