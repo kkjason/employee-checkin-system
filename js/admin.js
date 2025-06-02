@@ -174,9 +174,9 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 分頁查詢
     let paginatedQuery = query(q, limit(20));
     if (direction === 'next' && pageDocs[currentPage]) {
-      paginatedQuery = query(paginatedQuery, startAfter(pageDocs[currentPage].lastDoc));
+      paginatedQuery = query(q, startAfter(pageDocs[currentPage].lastDoc), limit(20));
     } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1]) {
-      paginatedQuery = query(paginatedQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
+      paginatedQuery = query(q, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
     }
 
     const querySnapshot = await getDocs(paginatedQuery);
@@ -191,14 +191,16 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     });
 
     // 更新分頁資料
-    if (direction === 'next' && records.length > 0) {
-      currentPage++;
-      pageDocs[currentPage] = { firstDoc, lastDoc };
-    } else if (direction === 'prev' && currentPage > 0 && records.length > 0) {
-      currentPage--;
-    } else if (direction === '' && records.length > 0) {
-      pageDocs = [{ firstDoc, lastDoc }];
-      currentPage = 0;
+    if (records.length > 0) {
+      if (direction === 'next') {
+        currentPage++;
+        pageDocs[currentPage] = { firstDoc, lastDoc };
+      } else if (direction === 'prev' && currentPage > 0) {
+        currentPage--;
+      } else if (direction === '') {
+        pageDocs = [{ firstDoc, lastDoc }];
+        currentPage = 0;
+      }
     }
 
     // 整合紀錄（僅在 consolidated 模式下）
@@ -227,6 +229,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         const dateB = new Date(b.checkin ? b.checkin.timestamp : b.checkout.timestamp).getTime();
         return dateB - dateA; // 按日期降序
       });
+      totalRecords = Object.keys(consolidatedRecords).length;
     } else {
       // 原始模式直接使用查詢結果
       displayRecords = records;
