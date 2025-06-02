@@ -1,3 +1,4 @@
+// js/admin.js
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
 import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
@@ -7,7 +8,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCv1ywEy0oaL8FNBLAEO-Ban5lMs26Y_gY",
   authDomain: "employee-checkin-system.firebaseapp.com",
   projectId: "employee-checkin-system",
-  storageBucket: "employee-checkin-system.firebasestorage.app",
+  storageBucket: "employee-checkin-system.storage.googleapis.com",
   messagingSenderId: "646412258577",
   appId: "1:646412258577:web:7f32d3c069c415c9b190b0"
 };
@@ -161,34 +162,22 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     allRecords = [];
 
     if (viewMode === 'raw') {
-      let displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
-      let allQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
+      let baseQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
 
       // 應用篩選條件
-      if (name) {
-        displayQuery = query(displayQuery, where('name', '==', name));
-        allQuery = query(allQuery, where('name', '==', name));
-      }
-      if (location) {
-        displayQuery = query(displayQuery, where('location', '==', location));
-        allQuery = query(allQuery, where('location', '==', location));
-      }
-      if (startDate) {
-        displayQuery = query(displayQuery, where('timestamp', '>=', new Date(startDate).getTime()));
-        allQuery = query(allQuery, where('timestamp', '>=', new Date(startDate).getTime()));
-      }
-      if (endDate) {
-        displayQuery = query(displayQuery, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
-        allQuery = query(allQuery, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
-      }
+      if (name) baseQuery = query(baseQuery, where('name', '==', name));
+      if (location) baseQuery = query(baseQuery, where('location', '==', location));
+      if (startDate) baseQuery = query(baseQuery, where('timestamp', '>=', new Date(startDate).getTime()));
+      if (endDate) baseQuery = query(baseQuery, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
 
       // 分頁邏輯
+      let displayQuery = baseQuery;
       if (direction === 'next' && pageDocs[currentPage]?.lastDoc) {
-        displayQuery = query(displayQuery, startAfter(pageDocs[currentPage].lastDoc), limit(20));
+        displayQuery = query(baseQuery, startAfter(pageDocs[currentPage].lastDoc), limit(20));
       } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1]?.firstDoc) {
-        displayQuery = query(displayQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
+        displayQuery = query(baseQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
       } else {
-        displayQuery = query(displayQuery, limit(20));
+        displayQuery = query(baseQuery, limit(20));
       }
 
       // 查詢顯示紀錄
@@ -202,14 +191,15 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       });
 
       // 查詢所有紀錄（用於匯出和總數計算）
-      const allSnapshot = await getDocs(allQuery);
+      const allSnapshot = await getDocs(baseQuery);
       allSnapshot.forEach((doc) => {
         allRecords.push({ id: doc.id, ...doc.data() });
       });
 
       // 更新分頁資料
       if (records.length > 0) {
-        pageDocs[currentPage + (direction === 'next' ? 1 : 0)] = { firstDoc, lastDoc };
+        const pageIndex = direction === 'next' ? currentPage + 1 : currentPage;
+        pageDocs[pageIndex] = { firstDoc, lastDoc };
         if (direction === 'next') {
           currentPage++;
         } else if (direction === 'prev' && currentPage > 0) {
