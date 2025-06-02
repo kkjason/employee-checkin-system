@@ -1,4 +1,4 @@
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, OAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { collection, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 // 多語言翻譯
@@ -13,11 +13,14 @@ const translations = {
     forgotPassword: '忘記密碼？',
     noAccount: '尚未有帳號？',
     registerBtn: '註冊新帳號',
+    googleLoginBtn: '使用 Google 帳號登入',
+    appleLoginBtn: '使用 Apple 帳號登入',
     registerTitle: '註冊新帳號',
     registerSubmit: '提交註冊',
     backToLogin: '返回輸入',
     emptyFields: '請輸入電子郵件、密碼和姓名',
     emptyEmail: '請輸入電子郵件',
+    emptyName: '請輸入姓名',
     loginFailed: '輸入失敗',
     passwordResetSent: '密碼重設輸入已發送',
     passwordResetFailed: '密碼重設失敗',
@@ -25,13 +28,15 @@ const translations = {
     registerSuccess: '註冊成功，請輸入',
     nameLabel: '姓名',
     namePlaceholder: '請輸入您的姓名',
+    setNameTitle: '設定您的姓名',
+    setNameSubmit: '提交姓名',
     checkinTitle: '員工打卡系統 (2)',
     checkinHeader: '打卡',
     locationLabel: '地點',
     locationOption: '宏匯',
     checkinBtn: '上班打卡',
     checkoutBtn: '下班打卡',
-    logoutBtn: '登記',
+    logoutBtn: '登出',
     emptyLocation: '請選擇地點',
     ipError: '無法獲取您的 IP 地址，請檢查網絡',
     wifiError: '請連接到餐廳WIFI',
@@ -40,7 +45,7 @@ const translations = {
     checkinFailed: '打卡失敗',
     logoutFailed: '登出失敗',
     nameNotFound: '未找到註冊姓名，請聯繫管理員',
-    error: '打卡失敗'
+    error: '錯誤'
   },
   vi: {
     title: 'Đăng nhập hệ thống chấm công nhân viên (2)',
@@ -50,13 +55,16 @@ const translations = {
     passwordPlaceholder: 'Vui lòng nhập mật khẩu',
     loginBtn: 'Đăng nhập',
     forgotPassword: 'Quên mật khẩu?',
-    noAccountLabel: 'Chưa có tài khoản? ',
+    noAccount: 'Chưa có tài khoản?',
     registerBtn: 'Đăng ký tài khoản mới',
-    registerTitle: 'Ký tài khoản mới',
-    registerSubmit: 'Gửi ký',
+    googleLoginBtn: 'Đăng nhập bằng tài khoản Google',
+    appleLoginBtn: 'Đăng nhập bằng tài khoản Apple',
+    registerTitle: 'Đăng ký tài khoản mới',
+    registerSubmit: 'Gửi đăng ký',
     backToLogin: 'Quay lại đăng nhập',
     emptyFields: 'Vui lòng nhập email, mật khẩu và tên',
     emptyEmail: 'Vui lòng nhập email',
+    emptyName: 'Vui lòng nhập tên',
     loginFailed: 'Đăng nhập thất bại',
     passwordResetSent: 'Email đặt lại mật khẩu đã được gửi',
     passwordResetFailed: 'Đặt lại mật khẩu thất bại',
@@ -64,6 +72,8 @@ const translations = {
     registerSuccess: 'Đăng ký thành công, vui lòng đăng nhập',
     nameLabel: 'Tên',
     namePlaceholder: 'Vui lòng nhập tên của bạn',
+    setNameTitle: 'Thiết lập tên của bạn',
+    setNameSubmit: 'Gửi tên',
     checkinTitle: 'Hệ thống chấm công nhân viên (2)',
     checkinHeader: 'Chấm công',
     locationLabel: 'Địa điểm',
@@ -79,7 +89,7 @@ const translations = {
     checkinFailed: 'Chấm công thất bại',
     logoutFailed: 'Đăng xuất thất bại',
     nameNotFound: 'Không tìm thấy tên đã đăng ký, vui lòng liên hệ quản trị viên',
-    error: 'Chấm công thất bại'
+    error: 'Lỗi'
   },
   en: {
     title: 'Employee Check-in System Login (2)',
@@ -91,11 +101,14 @@ const translations = {
     forgotPassword: 'Forgot password?',
     noAccount: 'Don’t have an account?',
     registerBtn: 'Register new account',
+    googleLoginBtn: 'Sign in with Google',
+    appleLoginBtn: 'Sign in with Apple',
     registerTitle: 'Register New Account',
     registerSubmit: 'Submit Registration',
     backToLogin: 'Back to Login',
     emptyFields: 'Please enter email, password, and name',
     emptyEmail: 'Please enter email',
+    emptyName: 'Please enter your name',
     loginFailed: 'Login failed',
     passwordResetSent: 'Password reset email sent',
     passwordResetFailed: 'Password reset failed',
@@ -103,6 +116,8 @@ const translations = {
     registerSuccess: 'Registration successful, please login',
     nameLabel: 'Name',
     namePlaceholder: 'Please enter your name',
+    setNameTitle: 'Set Your Name',
+    setNameSubmit: 'Submit Name',
     checkinTitle: 'Employee Check-in System (2)',
     checkinHeader: 'Check-in',
     locationLabel: 'Location',
@@ -118,7 +133,7 @@ const translations = {
     checkinFailed: 'Check-in failed',
     logoutFailed: 'Logout failed',
     nameNotFound: 'Registered name not found, please contact the administrator',
-    error: 'Check-in failed'
+    error: 'Error'
   }
 };
 
@@ -139,6 +154,69 @@ export async function getUserName(db, userId) {
     console.error('獲取用戶姓名失敗:', error);
     return null;
   }
+}
+
+// 顯示姓名輸入表單
+export async function showNameInputForm(auth, db, userId, lang = 'zh') {
+  const loginContainer = document.getElementById('login-container');
+  const t = translations[lang];
+
+  loginContainer.innerHTML = `
+    <div class="flex justify-center mb-4">
+      <button class="lang-btn px-4 py-2 mx-1 rounded-lg ${lang === 'zh' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}" data-lang="zh">中文</button>
+      <button class="lang-btn px-4 py-2 mx-1 rounded-lg ${lang === 'vi' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}" data-lang="vi">Tiếng Việt</button>
+      <button class="lang-btn px-4 py-2 mx-1 rounded-lg ${lang === 'en' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}" data-lang="en">English</button>
+    </div>
+    <div class="bg-white p-6 rounded-xl shadow-lg max-w-md mx-auto">
+      <h2 class="text-2xl font-bold text-indigo-700 mb-4">${t.setNameTitle}</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-gray-700 mb-1">${t.nameLabel}</label>
+          <input type="text" id="set-name" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.namePlaceholder}">
+        </div>
+        <button id="set-name-submit-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">${t.setNameSubmit}</button>
+      </div>
+    </div>
+  `;
+
+  // 語言切換事件
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newLang = btn.dataset.lang;
+      localStorage.setItem('language', newLang);
+      showNameInputForm(auth, db, userId, newLang);
+    });
+  });
+
+  document.getElementById('set-name-submit-btn').addEventListener('click', async () => {
+    const name = document.getElementById('set-name').value.trim();
+
+    if (!name) {
+      showAlert({
+        zh: t.emptyName,
+        vi: translations.vi.emptyName,
+        en: translations.en.emptyName
+      });
+      return;
+    }
+
+    try {
+      await setDoc(doc(db, 'users', userId), { name });
+      showAlert({
+        zh: t.registerSuccess,
+        vi: translations.vi.registerSuccess,
+        en: translations.en.registerSuccess
+      });
+      window.location.reload();
+    } catch (error) {
+      console.error('設定姓名失敗:', error);
+      showAlert({
+        zh: `${t.error}: ${error.message}`,
+        vi: `${translations.vi.error}: ${error.message}`,
+        en: `${translations.en.error}: ${error.message}`
+      });
+    }
+  });
 }
 
 export async function showLoginForm(auth, db, lang = 'zh') {
@@ -168,6 +246,8 @@ export async function showLoginForm(auth, db, lang = 'zh') {
           <input type="password" id="login-password" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.passwordPlaceholder}">
         </div>
         <button id="login-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">${t.loginBtn}</button>
+        <button id="google-login-btn" class="w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition-colors duration-200">${t.googleLoginBtn}</button>
+        <button id="apple-login-btn" class="w-full bg-black text-white p-3 rounded-lg hover:bg-gray-800 transition-colors duration-200">${t.appleLoginBtn}</button>
         <div class="text-center">
           <button id="forgot-password-btn" class="text-indigo-600 hover:underline">${t.forgotPassword}</button>
         </div>
@@ -213,6 +293,46 @@ export async function showLoginForm(auth, db, lang = 'zh') {
       console.log('登入成功');
     } catch (error) {
       console.error('登入失敗:', error);
+      showAlert({
+        zh: `${t.loginFailed}: ${error.message}`,
+        vi: `${translations.vi.loginFailed}: ${error.message}`,
+        en: `${translations.en.loginFailed}: ${error.message}`
+      });
+    }
+  });
+
+  document.getElementById('google-login-btn').addEventListener('click', async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      console.log('Google 登入成功:', user);
+      const userName = await getUserName(db, user.uid);
+      if (!userName) {
+        showNameInputForm(auth, db, user.uid, lang);
+      }
+    } catch (error) {
+      console.error('Google 登入失敗:', error);
+      showAlert({
+        zh: `${t.loginFailed}: ${error.message}`,
+        vi: `${translations.vi.loginFailed}: ${error.message}`,
+        en: `${translations.en.loginFailed}: ${error.message}`
+      });
+    }
+  });
+
+  document.getElementById('apple-login-btn').addEventListener('click', async () => {
+    const provider = new OAuthProvider('apple.com');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      console.log('Apple 登入成功:', user);
+      const userName = await getUserName(db, user.uid);
+      if (!userName) {
+        showNameInputForm(auth, db, user.uid, lang);
+      }
+    } catch (error) {
+      console.error('Apple 登入失敗:', error);
       showAlert({
         zh: `${t.loginFailed}: ${error.message}`,
         vi: `${translations.vi.loginFailed}: ${error.message}`,
@@ -279,6 +399,8 @@ export async function showRegisterForm(auth, db, lang = 'zh') {
           <input type="text" id="register-name" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="${t.namePlaceholder}">
         </div>
         <button id="register-submit-btn" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors duration-200">${t.registerSubmit}</button>
+        <button id="google-register-btn" class="w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition-colors duration-200">${t.googleLoginBtn}</button>
+        <button id="apple-register-btn" class="w-full bg-black text-white p-3 rounded-lg hover:bg-gray-800 transition-colors duration-200">${t.appleLoginBtn}</button>
         <div class="text-center">
           <button id="back-to-login-btn" class="text-indigo-600 hover:underline">${t.backToLogin}</button>
         </div>
@@ -321,6 +443,46 @@ export async function showRegisterForm(auth, db, lang = 'zh') {
       showLoginForm(auth, db, lang);
     } catch (error) {
       console.error('註冊失敗:', error);
+      showAlert({
+        zh: `${t.registerFailed}: ${error.message}`,
+        vi: `${translations.vi.registerFailed}: ${error.message}`,
+        en: `${translations.en.registerFailed}: ${error.message}`
+      });
+    }
+  });
+
+  document.getElementById('google-register-btn').addEventListener('click', async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      console.log('Google 註冊成功:', user);
+      const userName = await getUserName(db, user.uid);
+      if (!userName) {
+        showNameInputForm(auth, db, user.uid, lang);
+      }
+    } catch (error) {
+      console.error('Google 註冊失敗:', error);
+      showAlert({
+        zh: `${t.registerFailed}: ${error.message}`,
+        vi: `${translations.vi.registerFailed}: ${error.message}`,
+        en: `${translations.en.registerFailed}: ${error.message}`
+      });
+    }
+  });
+
+  document.getElementById('apple-register-btn').addEventListener('click', async () => {
+    const provider = new OAuthProvider('apple.com');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      console.log('Apple 註冊成功:', user);
+      const userName = await getUserName(db, user.uid);
+      if (!userName) {
+        showNameInputForm(auth, db, user.uid, lang);
+      }
+    } catch (error) {
+      console.error('Apple 註冊失敗:', error);
       showAlert({
         zh: `${t.registerFailed}: ${error.message}`,
         vi: `${translations.vi.registerFailed}: ${error.message}`,
