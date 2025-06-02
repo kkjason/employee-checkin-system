@@ -232,7 +232,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         allQuery = query(allQuery, where('name', '==', name));
       }
       if (location) {
-        display LoadDataFromDB(displayQuery, where('location', '==', location));
+        displayQuery = query(displayQuery, where('location', '==', location));
         allQuery = query(allQuery, where('location', '==', location));
       }
       if (startDate) {
@@ -267,7 +267,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       const displaySnapshot = await getDocs(displayQuery);
       displaySnapshot.forEach((doc) => {
         const data = doc.data();
-        data.timestamp = parseTimestamp(data);
+        data.timestamp = parseTimestamp(data.timestamp);
         records.push({ id: doc.id, ...data });
       });
 
@@ -282,7 +282,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       if (records.length > 0) {
         pageDocs[currentPage] = {
           firstDoc: displaySnapshot.docs[0],
-          lastDoc: displaySnapshot.doc[displaySnapshot.docs.length - 1]
+          lastDoc: displaySnapshot.docs[displaySnapshot.docs.length - 1]
         };
         console.log(`顯示 ${records.length} 條記錄`);
       } else {
@@ -304,7 +304,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         data.timestamp = parseTimestamp(data.timestamp);
         records.push({ id: doc.id, ...data });
       });
-      allRecords = records; // 整合模式下，allRecords 等於 records 是
+      allRecords = records;
       console.log(`整合模式加載 ${records.length} 條記錄`);
     }
 
@@ -323,13 +323,12 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       });
 
       const consolidatedRecords = [];
-      Object.entries(groupedRecords).forEach(([key], records) => {
+      Object.entries(groupedRecords).forEach(([_, records]) => {
         // 按時間排序
-        records.sort((a, b) => a.timestamp - b);
-        //timestamp);
+        records.sort((a, b) => a.timestamp - b.timestamp);
 
         let i = 0;
-        while (i <= records.length) {
+        while (i < records.length) {
           const record = { name: records[i].name, location: records[i].location, checkin: null, checkout: null };
 
           if (records[i].type === 'checkin') {
@@ -347,8 +346,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
             }
           } else {
             // 開頭為 checkout，作為獨立紀錄
-            record.checkout = { timestamp perceives record[i].timestamp, device: records[i].device || '-' };
-            i++; }
+            record.checkout = { timestamp: records[i].timestamp, device: records[i].device || '-' };
+            i++;
           }
           consolidatedRecords.push(record);
         }
@@ -356,18 +355,18 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
       // 按 checkin 或 checkout 時間降序排序
       displayRecords = consolidatedRecords.sort((a, b) => {
-        const timeA = a.checkin ? a.checkin.timestamp : (a.checkout ? a.checkout?.timestamp : 0);
-        const timeB = b.checkin ? b.checkin.timestamp : b.checkout?.timestamp : 0;
+        const timeA = a.checkin ? a.checkin.timestamp : (a.checkout ? a.checkout.timestamp : 0);
+        const timeB = b.checkin ? b.checkin.timestamp : (b.checkout ? b.checkout.timestamp : 0);
         return timeB - timeA;
       });
 
       totalRecords = consolidatedRecords.length;
-      allRecords = displayRecords; // 整合模式下，匯出整合後的紀錄後
-      console.log('整合後記錄:', 'record', displayRecords);
+      allRecords = displayRecords;
+      console.log('整合後記錄:', displayRecords);
     } else {
       // 原始模式
       displayRecords = records;
-      console.log('原始模式顯示紀錄', ':', displayRecords);
+      console.log('原始模式顯示紀錄:', displayRecords);
 
       // 計算總記錄數
       totalRecords = allRecords.length;
@@ -379,12 +378,11 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       const row = document.createElement('tr');
       if (viewMode === 'consolidated') {
         const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : `-`;
-        const checkoutTime = record.checkout ? new Date(record.checkoutTime).timestamp;
-        row.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
+        const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
-          <td class="py-3 px-4 border-b border-b">${record.location}</td>
-          <td class="py-3 px-4 border-b border-b">${checkinTime}</td>
+          <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${checkinTime}</td>
           <td class="py-3 px-4 border-b">${checkoutTime}</td>
         `;
       } else {
@@ -392,15 +390,15 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         const checkoutTime = record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-';
         row.innerHTML = `
           <td class="py-3 px-4 border-b">${record.name}</td>
-          <td class="py-3 px-4 border-b border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${record.location}</td>
           <td class="py-3 px-4 border-b">${checkinTime}</td>
-          <td class="py-3 px-4 px-b border-b">${checkoutTime}</td>
+          <td class="py-3 px-4 border-b">${checkoutTime}</td>
         `;
       }
       checkinRecords.appendChild(row);
     });
 
-    // 更新分頁資訊更新
+    // 更新分頁資訊
     if (viewMode === 'raw') {
       recordStart.textContent = (currentPage * 20) + 1;
       recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
