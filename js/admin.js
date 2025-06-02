@@ -190,7 +190,7 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       let baseQuery = query(
         collection(db, 'checkins'),
         orderBy('timestamp', 'desc'),
-        orderBy('__name__', 'desc') // 次要排序確保唯一性
+        orderBy('__name__', 'desc')
       );
 
       // 應用篩選條件
@@ -257,12 +257,12 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
     let displayRecords = [];
     let totalRecords = 0;
 
+    // --- 整合模式跨日出勤合併核心（支援大夜班） ---
     if (viewMode === 'consolidated') {
-      // 整合模式：按姓名、地點、日期分組
+      // 依人員+地點分組
       const groupedRecords = {};
       records.forEach(record => {
-        const date = formatDate(record.timestamp);
-        const key = `${record.name}_${record.location}_${date}`;
+        const key = `${record.name}_${record.location}`;
         if (!groupedRecords[key]) {
           groupedRecords[key] = [];
         }
@@ -270,29 +270,34 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       });
 
       const consolidatedRecords = [];
-      Object.entries(groupedRecords).forEach(([key, records]) => {
-        records.sort((a, b) => a.timestamp - b.timestamp);
-        const [name, location, date] = key.split('_');
+      Object.entries(groupedRecords).forEach(([key, recs]) => {
+        recs.sort((a, b) => a.timestamp - b.timestamp);
         let i = 0;
-        while (i < records.length) {
-          const record = { name, location, date, checkin: null, checkout: null };
-          if (records[i].type === 'checkin') {
-            record.checkin = { timestamp: records[i].timestamp, device: records[i].device || '-' };
-            let j = i + 1;
-            while (j < records.length && records[j].type !== 'checkout') {
-              j++;
+        while (i < recs.length) {
+          if (recs[i].type === 'checkin') {
+            const checkin = recs[i];
+            // 找 12 小時內第一個 checkout
+            let checkout = null;
+            for (let j = i + 1; j < recs.length; j++) {
+              if (
+                recs[j].type === 'checkout' &&
+                recs[j].timestamp - checkin.timestamp > 0 &&
+                recs[j].timestamp - checkin.timestamp <= 12 * 60 * 60 * 1000
+              ) {
+                checkout = recs[j];
+                i = j; // 跳到下個循環
+                break;
+              }
             }
-            if (j < records.length && formatDate(records[j].timestamp) === date) {
-              record.checkout = { timestamp: records[j].timestamp, device: records[j].device || '-' };
-              i = j + 1;
-            } else {
-              i++;
-            }
-          } else {
-            record.checkout = { timestamp: records[i].timestamp, device: records[i].device || '-' };
-            i++;
+            consolidatedRecords.push({
+              name: checkin.name,
+              location: checkin.location,
+              date: formatDate(checkin.timestamp), // 用上班日為出勤日
+              checkin: { timestamp: checkin.timestamp, device: checkin.device || '-' },
+              checkout: checkout ? { timestamp: checkout.timestamp, device: checkout.device || '-' } : null
+            });
           }
-          consolidatedRecords.push(record);
+          i++;
         }
       });
 
@@ -309,6 +314,7 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       totalRecords = allRecords.length;
       console.log(`原始模式顯示 ${displayRecords.length} 筆記錄`);
     }
+    // --- end ---
 
     // 渲染紀錄
     checkinRecords.innerHTML = '';
@@ -452,7 +458,7 @@ async function loadIPWhitelist() {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
         const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
-       if (newIp && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(newIp)) {
+        if (newIp && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(newIp)) {
           try {
             await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
             loadIPWhitelist();
