@@ -169,6 +169,17 @@
       return ip.split('.').reduce((int, oct) => (int << 8) + parseInt(oct, 10), 0) >>> 0;
     }
 
+    // 格式化時間戳為 YYYY/M/D HH:mm:ss（24 小時制）
+    function formatTimestamp(date) {
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+    }
+
     // 渲染打卡表單
     async function renderCheckinForm(lang = 'zh') {
       const t = getTranslations(lang);
@@ -224,7 +235,7 @@
 
       checkinBtn.addEventListener('click', async () => {
         const location = locationInput.value;
-        const deviceFingerprint = await generateDeviceFingerprint(); // 獲取設備信息
+        const deviceFingerprint = await generateDeviceFingerprint();
         const userIP = await getUserIP();
         const name = nameInput.value;
 
@@ -270,7 +281,7 @@
             name,
             location,
             type: 'checkin',
-            timestamp: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
+            timestamp: formatTimestamp(new Date()),
             device: deviceFingerprint,
             userId: auth.currentUser.uid,
             ip: userIP
@@ -283,16 +294,16 @@
         } catch (error) {
           console.error('打卡失敗:', error);
           showAlert({
-            zh: `${t.checkinFailed}: ${error.message}`,
-            vi: `${getTranslations('vi').checkinFailed}: ${error.message}`,
-            en: `${getTranslations('en').checkinFailed}: ${error.message}`
+            zh: `${t.error}: ${error.message}`,
+            vi: `${getTranslations('vi').error}: ${error.message}`,
+            en: `${getTranslations('en').error}: ${error.message}`
           });
         }
       });
 
       checkoutBtn.addEventListener('click', async () => {
         const location = locationInput.value;
-        const deviceFingerprint = await generateDeviceFingerprint(); // 獲取設備信息
+        const deviceFingerprint = await generateDeviceFingerprint();
         const userIP = await getUserIP();
         const name = nameInput.value;
 
@@ -338,7 +349,7 @@
             name,
             location,
             type: 'checkout',
-            timestamp: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
+            timestamp: formatTimestamp(new Date()),
             device: deviceFingerprint,
             userId: auth.currentUser.uid,
             ip: userIP
@@ -351,9 +362,9 @@
         } catch (error) {
           console.error('打卡失敗:', error);
           showAlert({
-            zh: `${t.checkinFailed}: ${error.message}`,
-            vi: `${getTranslations('vi').checkinFailed}: ${error.message}`,
-            en: `${getTranslations('en').checkinFailed}: ${error.message}`
+            zh: `${t.error}: ${error.message}`,
+            vi: `${getTranslations('vi').error}: ${error.message}`,
+            en: `${getTranslations('en').error}: ${error.message}`
           });
         }
       });
