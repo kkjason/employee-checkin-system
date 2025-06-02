@@ -64,7 +64,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
     import { getFirestore, collection, getDocs, query, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+    import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, OAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
     import { showLoginForm, generateDeviceFingerprint, getTranslations, getUserName } from '/js/2device_binding_flow.js';
 
     // Firebase 配置
@@ -396,7 +396,13 @@
           }
           loginContainer.classList.add('hidden');
           checkinContainer.classList.remove('hidden');
-          await renderCheckinForm(lang);
+          const userName = await getUserName(db, user.uid);
+          if (!userName) {
+            // 如果用戶尚未設定姓名，顯示姓名輸入表單
+            showNameInputForm(user.uid, lang);
+          } else {
+            await renderCheckinForm(lang);
+          }
         } else {
           console.log('無用戶登入');
           if (!loginContainer || !checkinContainer) {
