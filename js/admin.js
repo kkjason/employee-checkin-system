@@ -1,4 +1,4 @@
-// admin.js
+// js/admin.js
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
 import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
@@ -23,9 +23,9 @@ let currentNameFilter = '';
 let currentLocationFilter = '';
 let currentStartDate = null;
 let currentEndDate = null;
-let pageDocs = []; // 儲存每頁的 firstDoc 和 lastDoc
-let viewMode = 'raw'; // 顯示模式：'raw'（原始紀錄）或 'consolidated'（出勤整合）
-let totalRecords = 0; // 總記錄數
+let pageDocs = [];
+let viewMode = 'raw';
+let allRecords = [];
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
@@ -138,7 +138,9 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   const recordEnd = document.getElementById('record-end');
   const recordTotal = document.getElementById('record-total');
 
-  // 當篩選條件改變時，重置分頁狀態
+  checkinRecords.innerHTML = '<tr><td colspan="5" class="py-3 text-center">載入中...</td></tr>';
+
+  // 重置分頁
   if (
     currentNameFilter !== name ||
     currentLocationFilter !== location ||
@@ -147,7 +149,6 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   ) {
     currentPage = 0;
     pageDocs = [];
-    totalRecords = 0;
   }
 
   currentNameFilter = name;
@@ -156,135 +157,210 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   currentEndDate = endDate;
 
   try {
-    // 構建基礎查詢
-    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
-
-    // 應用篩選條件
-    if (name) q = query(q, where('name', '==', name));
-    if (location) q = query(q, where('location', '==', location));
-    if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
-    if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
-
-    // 計算總記錄數
-    if (currentPage === 0 || direction === '') {
-      const countSnapshot = await getDocs(q);
-      totalRecords = viewMode === 'consolidated' ? countSnapshot.size : countSnapshot.size;
-    }
-
-    // 分頁查詢
-    let paginatedQuery = q;
-    if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
-      paginatedQuery = query(paginatedQuery, startAfter(pageDocs[currentPage].lastDoc), limit(20));
-    } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1] && pageDocs[currentPage - 1].firstDoc) {
-      paginatedQuery = query(paginatedQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
-    } else {
-      paginatedQuery = query(paginatedQuery, limit(20));
-    }
-
-    const querySnapshot = await getDocs(paginatedQuery);
     let records = [];
-    let firstDoc = null;
-    let lastDoc = null;
+    allRecords = [];
 
-    querySnapshot.forEach((doc, index) => {
-      if (index === 0) firstDoc = doc;
-      if (index === querySnapshot.size - 1) lastDoc = doc;
-      records.push({ id: doc.id, ...doc.data() });
-    });
+    if (viewMode === 'raw') {
+      let displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
+      let allQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
 
-    // 更新分頁資料
-    if (records.length > 0) {
-      if (direction === 'next') {
-        pageDocs[currentPage + 1] = { firstDoc, lastDoc };
-        currentPage++;
-      } else if (direction === 'prev' && currentPage > 0) {
-        currentPage--;
-      } else if (direction === '') {
-        pageDocs = [{ firstDoc, lastDoc }];
-        currentPage = 0;
+      // 應用篩選條件
+      if (name) {
+        displayQuery = query(displayQuery, where('name', '==', name));
+        allQuery = query(allQuery, where('name', '==', name));
       }
+      if (location) {
+        displayQuery = query(displayQuery, where('location', '==', location));
+        allQuery = query(allQuery, where('location', '==', location));
+      }
+      if (startDate) {
+        displayQuery = query(displayQuery, where('timestamp', '>=', new Date(startDate).getTime()));
+        allQuery = query(allQuery, where('timestamp', '>=', new Date(startDate).getTime()));
+      }
+      if (endDate) {
+        displayQuery = query(displayQuery, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
+        allQuery = query(allQuery, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
+      }
+
+      // 分頁邏輯
+      if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
+        displayQuery = query(displayQuery, startAfter(pageDocs[currentPage].lastDoc), limit(20));
+      } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1] && pageDocs[currentPage - 1].firstDoc) {
+        displayQuery = query(displayQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
+      } else {
+        displayQuery = query(displayQuery, limit(20));
+      }
+
+      // 查詢顯示紀錄
+      const displaySnapshot = await getDocs(displayQuery);
+      let firstDoc = null;
+      let lastDoc = null;
+      displaySnapshot.forEach((doc, index) => {
+        if (index === 0) firstDoc = doc;
+        if (index === displaySnapshot.size - 1) lastDoc = doc;
+        records.push({ id: doc.id, ...doc.data() });
+      });
+
+      // 查詢所有紀錄（用於匯出）
+      const allSnapshot = await getDocs(allQuery);
+      allSnapshot.forEach((doc) => {
+        allRecords.push({ id: doc.id, ...doc.data() });
+      });
+
+      // 更新分頁資料
+      if (records.length > 0) {
+        pageDocs[currentPage] = { firstDoc, lastDoc };
+        if (direction === 'next') {
+          currentPage++;
+          pageDocs[currentPage] = { firstDoc, lastDoc };
+        } else if (direction === 'prev' && currentPage > 0) {
+          currentPage--;
+        }
+      }
+    } else {
+      // 整合模式：查詢所有符合條件的紀錄
+      let q = query(collection(db, 'checkins'), orderBy('timestamp', 'asc'));
+      if (name) q = query(q, where('name', '==', name));
+      if (location) q = query(q, where('location', '==', location));
+      if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
+      if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
+
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        records.push({ id: doc.id, ...doc.data() });
+      });
+      allRecords = records;
     }
 
-    // 整合紀錄（僅在 consolidated 模式下）
     let displayRecords = [];
+    let totalRecords = 0;
+
     if (viewMode === 'consolidated') {
-      const consolidatedRecords = {};
+      // 整合模式：按姓名、地點、日期分組
+      const groupedRecords = {};
       records.forEach(record => {
         const date = formatDate(record.timestamp);
-        const key = `${record.name}_${date}`;
-        if (!consolidatedRecords[key]) {
-          consolidatedRecords[key] = {
-            name: record.name,
-            location: record.location,
-            checkin: null,
-            checkout: null
-          };
+        const key = `${record.name}_${record.location}_${date}`;
+        if (!groupedRecords[key]) {
+          groupedRecords[key] = [];
         }
-        if (record.type === 'checkin') {
-          consolidatedRecords[key].checkin = { timestamp: record.timestamp, device: record.device || '-' };
-        } else if (record.type === 'checkout') {
-          consolidatedRecords[key].checkout = { timestamp: record.timestamp, device: record.device || '-' };
+        groupedRecords[key].push(record);
+      });
+
+      const consolidatedRecords = [];
+      Object.entries(groupedRecords).forEach(([key, records]) => {
+        records.sort((a, b) => a.timestamp - b.timestamp);
+        const [name, location, date] = key.split('_');
+        let i = 0;
+        while (i < records.length) {
+          const record = { name, location, date, checkin: null, checkout: null };
+          if (records[i].type === 'checkin') {
+            record.checkin = { timestamp: records[i].timestamp, device: records[i].device || '-' };
+            let j = i + 1;
+            while (j < records.length && records[j].type !== 'checkout') {
+              j++;
+            }
+            if (j < records.length && formatDate(records[j].timestamp) === date) {
+              record.checkout = { timestamp: records[j].timestamp, device: records[j].device || '-' };
+              i = j + 1;
+            } else {
+              i++;
+            }
+          } else {
+            record.checkout = { timestamp: records[i].timestamp, device: records[i].device || '-' };
+            i++;
+          }
+          consolidatedRecords.push(record);
         }
       });
-      displayRecords = Object.values(consolidatedRecords).sort((a, b) => {
-        const dateA = new Date(a.checkin ? a.checkin.timestamp : a.checkout.timestamp).getTime();
-        const dateB = new Date(b.checkin ? b.checkin.timestamp : b.checkout.timestamp).getTime();
-        return dateB - dateA; // 按日期降序
+
+      displayRecords = consolidatedRecords.sort((a, b) => {
+        const timeA = a.checkin ? a.checkin.timestamp : (a.checkout ? a.checkout.timestamp : 0);
+        const timeB = b.checkin ? b.checkin.timestamp : (b.checkout ? b.checkout.timestamp : 0);
+        return timeB - timeA;
       });
-      totalRecords = Object.keys(consolidatedRecords).length;
+      totalRecords = consolidatedRecords.length;
+      allRecords = displayRecords;
     } else {
-      // 原始模式直接使用查詢結果
       displayRecords = records;
+      totalRecords = allRecords.length;
     }
 
-    // 渲染記錄
+    // 渲染紀錄
     checkinRecords.innerHTML = '';
     displayRecords.forEach(record => {
-      const checkinTime = viewMode === 'consolidated' 
-        ? (record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-') 
-        : (record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-');
-      const checkoutTime = viewMode === 'consolidated' 
-        ? (record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-') 
-        : (record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-');
       const row = document.createElement('tr');
-      row.innerHTML = `
-        <td class="py-3 px-4 border-b">${record.name}</td>
-        <td class="py-3 px-4 border-b">${record.location}</td>
-        <td class="py-3 px-4 border-b">${checkinTime}</td>
-        <td class="py-3 px-4 border-b">${checkoutTime}</td>
-      `;
+      if (viewMode === 'consolidated') {
+        const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-';
+        const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
+        row.innerHTML = `
+          <td class="py-3 px-4 border-b">${record.name}</td>
+          <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${record.date}</td>
+          <td class="py-3 px-4 border-b">${checkinTime}</td>
+          <td class="py-3 px-4 border-b">${checkoutTime}</td>
+        `;
+      } else {
+        const checkinTime = record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-';
+        const checkoutTime = record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-';
+        row.innerHTML = `
+          <td class="py-3 px-4 border-b">${record.name}</td>
+          <td class="py-3 px-4 border-b">${record.location}</td>
+          <td class="py-3 px-4 border-b">${formatDate(record.timestamp)}</td>
+          <td class="py-3 px-4 border-b">${checkinTime}</td>
+          <td class="py-3 px-4 border-b">${checkoutTime}</td>
+        `;
+      }
       checkinRecords.appendChild(row);
     });
 
     // 更新分頁資訊
-    recordStart.textContent = displayRecords.length > 0 ? currentPage * 20 + 1 : 0;
-    recordEnd.textContent = displayRecords.length > 0 ? currentPage * 20 + displayRecords.length : 0;
+    if (viewMode === 'raw') {
+      recordStart.textContent = displayRecords.length > 0 ? currentPage * 20 + 1 : 0;
+      recordEnd.textContent = displayRecords.length > 0 ? currentPage * 20 + displayRecords.length : 0;
+    } else {
+      recordStart.textContent = displayRecords.length > 0 ? 1 : 0;
+      recordEnd.textContent = displayRecords.length;
+    }
     recordTotal.textContent = totalRecords;
 
     // 控制分頁按鈕
-    prevPageBtn.disabled = currentPage === 0;
-    nextPageBtn.disabled = querySnapshot.size < 20 || displayRecords.length === 0;
+    prevPageBtn.disabled = viewMode === 'consolidated' || currentPage === 0;
+    nextPageBtn.disabled = viewMode === 'consolidated' || records.length < 20;
+
+    // 匯出 Excel 按鈕
+    exportExcelBtn.removeEventListener('click', exportToExcel);
+    exportExcelBtn.addEventListener('click', () => exportToExcel());
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
-    checkinRecords.innerHTML = `<tr><td colspan="4" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.message}</td></tr>`;
+    checkinRecords.innerHTML = `<tr><td colspan="5" class="py-3 px-4 text-red-600 text-center">載入失敗: ${error.message}</td></tr>`;
   }
 }
 
-// 匯出 Excel 功能
-function exportToExcel(records) {
-  const data = records.map(record => {
-    return {
-      姓名: record.name,
-      地點: record.location,
-      上班時間: viewMode === 'consolidated' 
-        ? (record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-') 
-        : (record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-'),
-      下班時間: viewMode === 'consolidated' 
-        ? (record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-') 
-        : (record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-'),
-      設備: viewMode === 'consolidated' ? (record.checkin ? record.checkin.device : '-') : (record.device || '-')
-    };
+// 匯出 Excel
+function exportToExcel() {
+  const data = allRecords.map(record => {
+    if (viewMode === 'consolidated') {
+      return {
+        姓名: record.name,
+        地點: record.location,
+        日期: record.date,
+        上班時間: record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+        上班設備: record.checkin ? record.checkin.device : '-',
+        下班時間: record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+        下班設備: record.checkout ? record.checkout.device : '-'
+      };
+    } else {
+      return {
+        姓名: record.name,
+        地點: record.location,
+        日期: formatDate(record.timestamp),
+        上班時間: record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+        下班時間: record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+        設備: record.device || '-'
+      };
+    }
   });
 
   const ws = XLSX.utils.json_to_sheet(data);
@@ -293,7 +369,7 @@ function exportToExcel(records) {
   XLSX.writeFile(wb, `打卡紀錄_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
-// 載入 IP 白名單的函數
+// 載入 IP 白名單
 export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
   ipList.innerHTML = '';
