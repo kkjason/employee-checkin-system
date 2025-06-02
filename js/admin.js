@@ -1,4 +1,3 @@
-// js/admin.js
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
 import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
@@ -8,9 +7,9 @@ const firebaseConfig = {
   apiKey: "AIzaSyCv1ywEy0oaL8FNBLAEO-Ban5lMs26Y_gY",
   authDomain: "employee-checkin-system.firebaseapp.com",
   projectId: "employee-checkin-system",
-  storageBucket: "employee-checkin-system.storage.googleapis.com",
+  storageBucket: "employee-checkin-system.appspot.com",
   messagingSenderId: "646412258577",
-  appId: "1:646412258577:web:7f32d3c069c415c9b190b0"
+  appId: "1:646412258577:web:7f32d3c069c415c9b190b0",
 };
 
 // 初始化 Firebase
@@ -198,10 +197,10 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
       // 更新分頁資料
       if (records.length > 0) {
-        const pageIndex = direction === 'next' ? currentPage + 1 : currentPage;
-        pageDocs[pageIndex] = { firstDoc, lastDoc };
+        pageDocs[currentPage] = { firstDoc, lastDoc };
         if (direction === 'next') {
           currentPage++;
+          pageDocs[currentPage] = { firstDoc, lastDoc };
         } else if (direction === 'prev' && currentPage > 0) {
           currentPage--;
         }
