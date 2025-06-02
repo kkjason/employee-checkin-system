@@ -156,7 +156,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   currentEndDate = endDate;
 
   try {
-    // 構建查詢
+    // 構建基礎查詢
     let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
 
     // 應用篩選條件
@@ -166,18 +166,19 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
 
     // 計算總記錄數
-    if (currentPage === 0) {
+    if (currentPage === 0 || direction === '') {
       const countSnapshot = await getDocs(q);
       totalRecords = countSnapshot.size;
     }
 
     // 分頁查詢
-    let paginatedQuery = query(q, limit(20));
-    if (direction === 'next' && pageDocs[currentPage]) {
-      paginatedQuery = query(q, startAfter(pageDocs[currentPage].lastDoc), limit(20));
-    } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1]) {
-      paginatedQuery = query(q, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
+    let paginatedQuery = q;
+    if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
+      paginatedQuery = query(paginatedQuery, startAfter(pageDocs[currentPage].lastDoc));
+    } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1] && pageDocs[currentPage - 1].firstDoc) {
+      paginatedQuery = query(paginatedQuery, endBefore(pageDocs[currentPage - 1].firstDoc));
     }
+    paginatedQuery = query(paginatedQuery, limit(20));
 
     const querySnapshot = await getDocs(paginatedQuery);
     let records = [];
@@ -255,8 +256,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     });
 
     // 更新分頁資訊
-    recordStart.textContent = currentPage * 20 + 1;
-    recordEnd.textContent = currentPage * 20 + Math.min(20, displayRecords.length);
+    recordStart.textContent = displayRecords.length > 0 ? currentPage * 20 + 1 : 0;
+    recordEnd.textContent = displayRecords.length > 0 ? currentPage * 20 + displayRecords.length : 0;
     recordTotal.textContent = totalRecords;
 
     // 控制分頁按鈕
