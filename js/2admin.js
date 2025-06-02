@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
-import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -16,6 +16,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+
+// 硬編碼的管理員 UID 清單（請替換為實際 UID）
+const ADMIN_UIDS = ['YOUR_ADMIN_UID_HERE']; // 請填入您的管理員 UID
 
 let currentPage = 0;
 let currentNameFilter = '';
@@ -87,20 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
-      // 檢查管理員權限
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
-          document.getElementById('admin-container').classList.remove('hidden');
-          ipManagement.classList.remove('hidden');
-          checkinManagement.classList.add('hidden');
-          await loadIPWhitelist();
-        } else {
-          console.log('無管理員權限');
-          window.location.href = '/2admin_login.html';
-        }
-      } catch (error) {
-        console.error('檢查權限失敗:', error);
+      // 檢查是否為管理員
+      if (ADMIN_UIDS.includes(user.uid)) {
+        document.getElementById('admin-container').classList.remove('hidden');
+        ipManagement.classList.remove('hidden');
+        checkinManagement.classList.add('hidden');
+        await loadIPWhitelist();
+      } else {
+        console.log('無管理員權限');
         window.location.href = '/2admin_login.html';
       }
     } else {
@@ -482,7 +479,8 @@ export async function loadIPWhitelist() {
         <div class="flex space-x-2">
           <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
           <button class="text-red-600 hover:text-red-800 delete-ip-btn px-2 py-1 border border-red-600 rounded-lg" data-id="${doc.id}">刪除</button>
-        `;
+        </div>
+      `;
       ipList.appendChild(li);
     });
 
