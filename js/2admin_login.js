@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -15,8 +15,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// 硬編碼的管理員 UID 清單（與 2admin.js 保持一致）
-const ADMIN_UIDS = ['YOUR_ADMIN_UID_HERE']; // 請填入您的管理員 UID
+// 管理員 UID，與安全規則中的 isAdmin 保持一致
+const ADMIN_UIDS = ['HkoddoWHmOWJ03OfnbU9SePx9uJ2'];
 
 // DOM 元素
 const loginBtn = document.getElementById('login-btn');
@@ -24,15 +24,18 @@ const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const errorMessage = document.getElementById('error-message');
 
-// 檢查用戶是否已登入
+// 檢查用戶狀態
 onAuthStateChanged(auth, (user) => {
-  if (user && ADMIN_UIDS.includes(user.uid)) {
-    console.log('管理員已登入:', user.email);
-    window.location.href = '/2admin.html';
-  } else if (user) {
-    console.log('非管理員用戶:', user.email);
-    errorMessage.textContent = '無管理員權限，請使用管理員帳號登入';
-    errorMessage.classList.remove('hidden');
+  if (user) {
+    if (ADMIN_UIDS.includes(user.uid)) {
+      console.log('管理員已登入:', user.email, 'UID:', user.uid);
+      window.location.assign('/2admin.html');
+    } else {
+      console.log('非管理員用戶:', user.email);
+      errorMessage.textContent = '無管理員權限，請使用管理員帳號登入';
+      errorMessage.classList.remove('hidden');
+      signOut(auth).then(() => console.log('非管理員已登出')).catch(err => console.error('登出失敗:', err));
+    }
   }
 });
 
@@ -40,6 +43,7 @@ onAuthStateChanged(auth, (user) => {
 loginBtn.addEventListener('click', async () => {
   const email = emailInput.value.trim();
   const password = passwordInput.value.trim();
+  errorMessage.classList.add('hidden');
 
   if (!email || !password) {
     errorMessage.textContent = '請輸入電子郵件和密碼';
@@ -50,13 +54,14 @@ loginBtn.addEventListener('click', async () => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    console.log('登入成功:', user.email);
+    console.log('登入成功:', user.email, 'UID:', user.uid);
     if (ADMIN_UIDS.includes(user.uid)) {
-      window.location.href = '/2admin.html';
+      window.location.assign('/2admin.html');
     } else {
       errorMessage.textContent = '無管理員權限，請使用管理員帳號登入';
       errorMessage.classList.remove('hidden');
-      await signOut(auth); // 非管理員登出
+      await signOut(auth);
+      console.log('非管理員已登出');
     }
   } catch (error) {
     console.error('登入失敗:', error);
