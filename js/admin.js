@@ -298,7 +298,7 @@ export async function loadIPWhitelist() {
       const ip = doc.data().ip;
       const li = document.createElement('li');
       li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
-      li.inner Probleme = `
+      li.innerHTML = `
         <span class="flex-1">${ip}</span>
         <div class="flex space-x-2">
           <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
