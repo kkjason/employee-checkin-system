@@ -257,12 +257,13 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
     let displayRecords = [];
     let totalRecords = 0;
 
-    // --- 整合模式跨日出勤合併核心（支援大夜班） ---
+    // --- 整合模式跨日出勤合併核心（支援大夜班、一對一配對） ---
     if (viewMode === 'consolidated') {
-      // 依人員+地點分組
+      // 依姓名+地點+日期分組
       const groupedRecords = {};
       records.forEach(record => {
-        const key = `${record.name}_${record.location}`;
+        const date = formatDate(record.timestamp);
+        const key = `${record.name}_${record.location}_${date}`;
         if (!groupedRecords[key]) {
           groupedRecords[key] = [];
         }
@@ -271,34 +272,41 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
 
       const consolidatedRecords = [];
       Object.entries(groupedRecords).forEach(([key, recs]) => {
-        recs.sort((a, b) => a.timestamp - b.timestamp);
-        let i = 0;
-        while (i < recs.length) {
-          if (recs[i].type === 'checkin') {
-            const checkin = recs[i];
-            // 找 12 小時內第一個 checkout
-            let checkout = null;
-            for (let j = i + 1; j < recs.length; j++) {
-              if (
-                recs[j].type === 'checkout' &&
-                recs[j].timestamp - checkin.timestamp > 0 &&
-                recs[j].timestamp - checkin.timestamp <= 12 * 60 * 60 * 1000
-              ) {
-                checkout = recs[j];
-                i = j; // 跳到下個循環
-                break;
-              }
+        // 分成 checkin 跟 checkout
+        const checkins = recs.filter(r => r.type === 'checkin').sort((a, b) => a.timestamp - b.timestamp);
+        const checkouts = recs.filter(r => r.type === 'checkout').sort((a, b) => a.timestamp - b.timestamp);
+
+        let usedCheckout = new Set();
+        checkins.forEach(checkin => {
+          // 找相符的 checkout
+          let checkout = null;
+          for (let i = 0; i < checkouts.length; i++) {
+            if (!usedCheckout.has(i) && checkouts[i].timestamp > checkin.timestamp && checkouts[i].timestamp - checkin.timestamp <= 12 * 60 * 60 * 1000) {
+              checkout = checkouts[i];
+              usedCheckout.add(i);
+              break;
             }
+          }
+          consolidatedRecords.push({
+            name: checkin.name,
+            location: checkin.location,
+            date: formatDate(checkin.timestamp),
+            checkin: { timestamp: checkin.timestamp, device: checkin.device || '-' },
+            checkout: checkout ? { timestamp: checkout.timestamp, device: checkout.device || '-' } : null
+          });
+        });
+        // 處理沒配對到的 checkout
+        checkouts.forEach((checkout, i) => {
+          if (!Array.from(usedCheckout).includes(i)) {
             consolidatedRecords.push({
-              name: checkin.name,
-              location: checkin.location,
-              date: formatDate(checkin.timestamp), // 用上班日為出勤日
-              checkin: { timestamp: checkin.timestamp, device: checkin.device || '-' },
-              checkout: checkout ? { timestamp: checkout.timestamp, device: checkout.device || '-' } : null
+              name: checkout.name,
+              location: checkout.location,
+              date: formatDate(checkout.timestamp),
+              checkin: null,
+              checkout: { timestamp: checkout.timestamp, device: checkout.device || '-' }
             });
           }
-          i++;
-        }
+        });
       });
 
       displayRecords = consolidatedRecords.sort((a, b) => {
