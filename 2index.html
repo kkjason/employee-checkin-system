@@ -65,7 +65,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
     import { getFirestore, collection, getDocs, query, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-    import { showLoginForm, generateDeviceFingerprint, getTranslations, getUserName } from '/js/device_binding_flow.js';
+    import { showLoginForm, generateDeviceFingerprint, getTranslations, getUserName } from '/js/2device_binding_flow.js';
 
     // Firebase 配置
     const firebaseConfig = {
@@ -132,13 +132,15 @@
         snapshot.forEach(doc => {
           const whitelistIP = doc.data().ip;
           if (whitelistIP === ip) {
-            isWhitelisted = true;
+            isWhitelisted = true; // 完全匹配
           } else if (whitelistIP.includes('/')) {
+            // 子網範圍匹配
             const [subnet, prefix] = whitelistIP.split('/');
             if (isInSubnet(ip, subnet, parseInt(prefix))) {
               isWhitelisted = true;
             }
           } else if (whitelistIP.endsWith('.0')) {
+            // 假設 192.168.0.0 表示 192.168.0.0/24
             const subnet = whitelistIP;
             if (isInSubnet(ip, subnet, 24)) {
               isWhitelisted = true;
@@ -170,6 +172,7 @@
     // 渲染打卡表單
     async function renderCheckinForm(lang = 'zh') {
       const t = getTranslations(lang);
+      // 獲取當前用戶姓名
       const userId = auth.currentUser?.uid;
       let name = '';
       if (userId) {
@@ -221,7 +224,7 @@
 
       checkinBtn.addEventListener('click', async () => {
         const location = locationInput.value;
-        const deviceFingerprint = await generateDeviceFingerprint();
+        const deviceFingerprint = await generateDeviceFingerprint(); // 獲取設備信息
         const userIP = await getUserIP();
         const name = nameInput.value;
 
@@ -289,7 +292,7 @@
 
       checkoutBtn.addEventListener('click', async () => {
         const location = locationInput.value;
-        const deviceFingerprint = await generateDeviceFingerprint();
+        const deviceFingerprint = await generateDeviceFingerprint(); // 獲取設備信息
         const userIP = await getUserIP();
         const name = nameInput.value;
 
@@ -371,15 +374,24 @@
 
     // 等待 DOM 載入完成
     document.addEventListener('DOMContentLoaded', () => {
+      // 身份驗證狀態監聽
       onAuthStateChanged(auth, async (user) => {
         const lang = localStorage.getItem('language') || 'zh';
         if (user) {
           console.log('用戶 UID:', user.uid, '電子郵件:', user.email);
+          if (!loginContainer || !checkinContainer) {
+            console.error('找不到 loginContainer 或 checkinContainer');
+            return;
+          }
           loginContainer.classList.add('hidden');
           checkinContainer.classList.remove('hidden');
           await renderCheckinForm(lang);
         } else {
           console.log('無用戶登入');
+          if (!loginContainer || !checkinContainer) {
+            console.error('找不到 loginContainer 或 checkinContainer');
+            return;
+          }
           loginContainer.classList.remove('hidden');
           checkinContainer.classList.add('hidden');
           showLoginForm(auth, db, lang);
