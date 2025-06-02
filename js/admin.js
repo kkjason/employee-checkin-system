@@ -168,17 +168,18 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 計算總記錄數
     if (currentPage === 0 || direction === '') {
       const countSnapshot = await getDocs(q);
-      totalRecords = countSnapshot.size;
+      totalRecords = viewMode === 'consolidated' ? countSnapshot.size : countSnapshot.size;
     }
 
     // 分頁查詢
     let paginatedQuery = q;
     if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
-      paginatedQuery = query(paginatedQuery, startAfter(pageDocs[currentPage].lastDoc));
+      paginatedQuery = query(paginatedQuery, startAfter(pageDocs[currentPage].lastDoc), limit(20));
     } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1] && pageDocs[currentPage - 1].firstDoc) {
-      paginatedQuery = query(paginatedQuery, endBefore(pageDocs[currentPage - 1].firstDoc));
+      paginatedQuery = query(paginatedQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
+    } else {
+      paginatedQuery = query(paginatedQuery, limit(20));
     }
-    paginatedQuery = query(paginatedQuery, limit(20));
 
     const querySnapshot = await getDocs(paginatedQuery);
     let records = [];
@@ -194,8 +195,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 更新分頁資料
     if (records.length > 0) {
       if (direction === 'next') {
+        pageDocs[currentPage + 1] = { firstDoc, lastDoc };
         currentPage++;
-        pageDocs[currentPage] = { firstDoc, lastDoc };
       } else if (direction === 'prev' && currentPage > 0) {
         currentPage--;
       } else if (direction === '') {
