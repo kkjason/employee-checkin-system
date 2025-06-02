@@ -25,6 +25,7 @@ let currentStartDate = null;
 let currentEndDate = null;
 let pageDocs = []; // 儲存每頁的 firstDoc 和 lastDoc
 let viewMode = 'raw'; // 顯示模式：'raw'（原始紀錄）或 'consolidated'（出勤整合）
+let totalRecords = 0; // 總記錄數
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
@@ -146,6 +147,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   ) {
     currentPage = 0;
     pageDocs = [];
+    totalRecords = 0;
   }
 
   currentNameFilter = name;
@@ -154,7 +156,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   currentEndDate = endDate;
 
   try {
-    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
+    // 構建查詢
+    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
 
     // 應用篩選條件
     if (name) q = query(q, where('name', '==', name));
@@ -162,14 +165,21 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
     if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
 
-    // 分頁邏輯
-    if (direction === 'next' && pageDocs[currentPage]) {
-      q = query(q, startAfter(pageDocs[currentPage].lastDoc));
-    } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1]) {
-      q = query(q, endBefore(pageDocs[currentPage - 1].firstDoc));
+    // 計算總記錄數
+    if (currentPage === 0) {
+      const countSnapshot = await getDocs(q);
+      totalRecords = countSnapshot.size;
     }
 
-    const querySnapshot = await getDocs(q);
+    // 分頁查詢
+    let paginatedQuery = query(q, limit(20));
+    if (direction === 'next' && pageDocs[currentPage]) {
+      paginatedQuery = query(paginatedQuery, startAfter(pageDocs[currentPage].lastDoc));
+    } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1]) {
+      paginatedQuery = query(paginatedQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
+    }
+
+    const querySnapshot = await getDocs(paginatedQuery);
     let records = [];
     let firstDoc = null;
     let lastDoc = null;
@@ -181,48 +191,56 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     });
 
     // 更新分頁資料
-    if (direction === 'next') {
+    if (direction === 'next' && records.length > 0) {
       currentPage++;
       pageDocs[currentPage] = { firstDoc, lastDoc };
-    } else if (direction === 'prev' && currentPage > 0) {
+    } else if (direction === 'prev' && currentPage > 0 && records.length > 0) {
       currentPage--;
-    } else if (direction === '') {
+    } else if (direction === '' && records.length > 0) {
       pageDocs = [{ firstDoc, lastDoc }];
       currentPage = 0;
     }
 
-    // 整合紀錄
-    const consolidatedRecords = {};
-    records.forEach(record => {
-      const date = formatDate(record.timestamp);
-      const key = `${record.name}_${date}`;
-      if (!consolidatedRecords[key]) {
-        consolidatedRecords[key] = {
-          name: record.name,
-          location: record.location,
-          checkin: null,
-          checkout: null
-        };
-      }
-      if (record.type === 'checkin') {
-        consolidatedRecords[key].checkin = { timestamp: record.timestamp, device: record.device || '-' };
-      } else if (record.type === 'checkout') {
-        consolidatedRecords[key].checkout = { timestamp: record.timestamp, device: record.device || '-' };
-      }
-    });
-
-    // 轉為陣列並排序
-    const displayRecords = Object.values(consolidatedRecords).sort((a, b) => {
-      const dateA = new Date(a.checkin ? a.checkin.timestamp : a.checkout.timestamp).getTime();
-      const dateB = new Date(b.checkin ? b.checkin.timestamp : b.checkout.timestamp).getTime();
-      return dateB - dateA; // 按日期降序
-    });
+    // 整合紀錄（僅在 consolidated 模式下）
+    let displayRecords = [];
+    if (viewMode === 'consolidated') {
+      const consolidatedRecords = {};
+      records.forEach(record => {
+        const date = formatDate(record.timestamp);
+        const key = `${record.name}_${date}`;
+        if (!consolidatedRecords[key]) {
+          consolidatedRecords[key] = {
+            name: record.name,
+            location: record.location,
+            checkin: null,
+            checkout: null
+          };
+        }
+        if (record.type === 'checkin') {
+          consolidatedRecords[key].checkin = { timestamp: record.timestamp, device: record.device || '-' };
+        } else if (record.type === 'checkout') {
+          consolidatedRecords[key].checkout = { timestamp: record.timestamp, device: record.device || '-' };
+        }
+      });
+      displayRecords = Object.values(consolidatedRecords).sort((a, b) => {
+        const dateA = new Date(a.checkin ? a.checkin.timestamp : a.checkout.timestamp).getTime();
+        const dateB = new Date(b.checkin ? b.checkin.timestamp : b.checkout.timestamp).getTime();
+        return dateB - dateA; // 按日期降序
+      });
+    } else {
+      // 原始模式直接使用查詢結果
+      displayRecords = records;
+    }
 
     // 渲染記錄
     checkinRecords.innerHTML = '';
     displayRecords.forEach(record => {
-      const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-';
-      const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
+      const checkinTime = viewMode === 'consolidated' 
+        ? (record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-') 
+        : (record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-');
+      const checkoutTime = viewMode === 'consolidated' 
+        ? (record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-') 
+        : (record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-');
       const row = document.createElement('tr');
       row.innerHTML = `
         <td class="py-3 px-4 border-b">${record.name}</td>
@@ -236,11 +254,11 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     // 更新分頁資訊
     recordStart.textContent = currentPage * 20 + 1;
     recordEnd.textContent = currentPage * 20 + Math.min(20, displayRecords.length);
-    recordTotal.textContent = displayRecords.length;
+    recordTotal.textContent = totalRecords;
 
     // 控制分頁按鈕
     prevPageBtn.disabled = currentPage === 0;
-    nextPageBtn.disabled = querySnapshot.size < 20;
+    nextPageBtn.disabled = querySnapshot.size < 20 || displayRecords.length === 0;
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
@@ -254,9 +272,13 @@ function exportToExcel(records) {
     return {
       姓名: record.name,
       地點: record.location,
-      上班時間: record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
-      下班時間: record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
-      設備: record.checkin ? record.checkin.device : '-'
+      上班時間: viewMode === 'consolidated' 
+        ? (record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-') 
+        : (record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-'),
+      下班時間: viewMode === 'consolidated' 
+        ? (record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-') 
+        : (record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-'),
+      設備: viewMode === 'consolidated' ? (record.checkin ? record.checkin.device : '-') : (record.device || '-')
     };
   });
 
@@ -276,7 +298,7 @@ export async function loadIPWhitelist() {
       const ip = doc.data().ip;
       const li = document.createElement('li');
       li.className = 'flex justify-between items-center p-2 bg-gray-50 rounded-lg';
-      li.innerHTML = `
+      li.inner Probleme = `
         <span class="flex-1">${ip}</span>
         <div class="flex space-x-2">
           <button class="text-blue-600 hover:text-blue-800 edit-ip-btn px-2 py-1 border border-blue-600 rounded-lg" data-id="${doc.id}">編輯</button>
