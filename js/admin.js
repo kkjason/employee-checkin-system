@@ -18,11 +18,12 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 let currentPage = 0;
+let lastDoc = null;
+let firstDoc = null;
 let currentNameFilter = '';
 let currentLocationFilter = '';
 let currentStartDate = null;
 let currentEndDate = null;
-let pageDocs = [];
 let viewMode = 'raw';
 let allRecords = [];
 
@@ -170,7 +171,8 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
     currentEndDate !== endDate
   ) {
     currentPage = 0;
-    pageDocs = [];
+    lastDoc = null;
+    firstDoc = null;
   }
 
   currentNameFilter = name;
@@ -178,14 +180,18 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
   currentStartDate = startDate;
   currentEndDate = endDate;
 
-  console.log(`查詢條件 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}, 模式: ${viewMode}`);
+  console.log(`查詢條件 - 姓名: ${name}, 地點: ${location}, 開始日期: ${startDate}, 結束日期: ${endDate}, 方向: ${direction}, 模式: ${viewMode}, 頁數: ${currentPage}`);
 
   try {
     let records = [];
     allRecords = [];
 
     if (viewMode === 'raw') {
-      let baseQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
+      let baseQuery = query(
+        collection(db, 'checkins'),
+        orderBy('timestamp', 'desc'),
+        orderBy('__name__', 'desc') // 次要排序確保唯一性
+      );
 
       // 應用篩選條件
       if (name) baseQuery = query(baseQuery, where('name', '==', name));
@@ -195,12 +201,12 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
 
       // 分頁邏輯
       let displayQuery = baseQuery;
-      if (direction === 'next' && pageDocs[currentPage]?.lastDoc) {
-        console.log('下一頁查詢，使用 lastDoc:', pageDocs[currentPage].lastDoc.id);
-        displayQuery = query(baseQuery, startAfter(pageDocs[currentPage].lastDoc), limit(20));
-      } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1]?.firstDoc) {
-        console.log('上一頁查詢，使用 firstDoc:', pageDocs[currentPage - 1].firstDoc.id);
-        displayQuery = query(baseQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
+      if (direction === 'next' && lastDoc) {
+        console.log('下一頁查詢，使用 lastDoc:', lastDoc.id);
+        displayQuery = query(baseQuery, startAfter(lastDoc), limit(20));
+      } else if (direction === 'prev' && firstDoc && currentPage > 0) {
+        console.log('上一頁查詢，使用 firstDoc:', firstDoc.id);
+        displayQuery = query(baseQuery, endBefore(firstDoc), limit(20));
       } else {
         console.log('初始查詢，第 1 頁');
         displayQuery = query(baseQuery, limit(20));
@@ -209,11 +215,11 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       // 查詢顯示紀錄
       const displaySnapshot = await getDocs(displayQuery);
       console.log(`查詢返回 ${displaySnapshot.size} 筆記錄`);
-      let firstDoc = null;
-      let lastDoc = null;
-      displaySnapshot.forEach((doc, index) => {
-        if (index === 0) firstDoc = doc;
-        if (index === displaySnapshot.size - 1) lastDoc = doc;
+
+      lastDoc = displaySnapshot.docs[displaySnapshot.size - 1] || null;
+      firstDoc = displaySnapshot.docs[0] || null;
+
+      displaySnapshot.forEach((doc) => {
         records.push({ id: doc.id, ...doc.data() });
       });
 
@@ -224,15 +230,13 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       });
       console.log(`總共 ${allRecords.length} 筆記錄用於匯出`);
 
-      // 更新分頁資料
+      // 更新頁數
       if (records.length > 0) {
-        if (direction === 'next' && currentPage < pageDocs.length) {
+        if (direction === 'next') {
           currentPage++;
         } else if (direction === 'prev' && currentPage > 0) {
           currentPage--;
         }
-        pageDocs[currentPage] = { firstDoc, lastDoc };
-        console.log(`當前頁數: ${currentPage}, pageDocs[${currentPage}]:`, pageDocs[currentPage]);
       }
     } else {
       // 整合模式：查詢所有符合條件的紀錄
@@ -448,7 +452,7 @@ async function loadIPWhitelist() {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
         const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
-        if (newIp && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(newIp)) {
+        if sprites && newIp && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(newIp) {
           try {
             await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
             loadIPWhitelist();
