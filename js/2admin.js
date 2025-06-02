@@ -329,24 +329,28 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         records.sort((a, b) => a.timestamp - b.timestamp);
 
         const [name, location, date] = key.split('_');
-        let record = { name, location, date, checkin: null, checkout: null };
+        let i = 0;
+        while (i < records.length) {
+          const record = { name, location, date, checkin: null, checkout: null };
 
-        // 尋找最早的 checkin 和最晚的 checkout
-        let earliestCheckin = null;
-        let latestCheckout = null;
-
-        records.forEach(r => {
-          if (r.type === 'checkin' && (!earliestCheckin || r.timestamp < earliestCheckin.timestamp)) {
-            earliestCheckin = { timestamp: r.timestamp, device: r.device || '-' };
+          if (records[i].type === 'checkin') {
+            record.checkin = { timestamp: records[i].timestamp, device: records[i].device || '-' };
+            // 尋找同一天的下一個 checkout
+            let j = i + 1;
+            while (j < records.length && records[j].type !== 'checkout') {
+              j++;
+            }
+            if (j < records.length && formatDate(records[j].timestamp) === date) {
+              record.checkout = { timestamp: records[j].timestamp, device: records[j].device || '-' };
+              i = j + 1; // 跳過已配對的 checkout
+            } else {
+              i++; // 無配對 checkout，保留單獨 checkin
+            }
+          } else {
+            // 開頭為 checkout，作為獨立紀錄
+            record.checkout = { timestamp: records[i].timestamp, device: records[i].device || '-' };
+            i++;
           }
-          if (r.type === 'checkout' && (!latestCheckout || r.timestamp > latestCheckout.timestamp)) {
-            latestCheckout = { timestamp: r.timestamp, device: r.device || '-' };
-          }
-        });
-
-        if (earliestCheckin || latestCheckout) {
-          record.checkin = earliestCheckin;
-          record.checkout = latestCheckout;
           consolidatedRecords.push(record);
         }
       });
