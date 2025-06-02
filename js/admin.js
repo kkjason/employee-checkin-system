@@ -1,4 +1,3 @@
-// js/admin.js
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
 import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
@@ -112,8 +111,9 @@ logoutBtn.addEventListener('click', async () => {
 // 新增 IP 位址
 addIpBtn.addEventListener('click', async () => {
   const ip = ipInput.value.trim();
-  if (!ip) {
-    alert('請輸入有效的 IP 位址');
+  const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  if (!ip || !ipRegex.test(ip)) {
+    alert('請輸入有效的 IPv4 位址');
     return;
   }
   try {
@@ -183,9 +183,9 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       }
 
       // 分頁邏輯
-      if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
+      if (direction === 'next' && pageDocs[currentPage]?.lastDoc) {
         displayQuery = query(displayQuery, startAfter(pageDocs[currentPage].lastDoc), limit(20));
-      } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1] && pageDocs[currentPage - 1].firstDoc) {
+      } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1]?.firstDoc) {
         displayQuery = query(displayQuery, endBefore(pageDocs[currentPage - 1].firstDoc), limit(20));
       } else {
         displayQuery = query(displayQuery, limit(20));
@@ -201,7 +201,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         records.push({ id: doc.id, ...doc.data() });
       });
 
-      // 查詢所有紀錄（用於匯出）
+      // 查詢所有紀錄（用於匯出和總數計算）
       const allSnapshot = await getDocs(allQuery);
       allSnapshot.forEach((doc) => {
         allRecords.push({ id: doc.id, ...doc.data() });
@@ -209,10 +209,9 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
       // 更新分頁資料
       if (records.length > 0) {
-        pageDocs[currentPage] = { firstDoc, lastDoc };
+        pageDocs[currentPage + (direction === 'next' ? 1 : 0)] = { firstDoc, lastDoc };
         if (direction === 'next') {
           currentPage++;
-          pageDocs[currentPage] = { firstDoc, lastDoc };
         } else if (direction === 'prev' && currentPage > 0) {
           currentPage--;
         }
@@ -372,9 +371,14 @@ function exportToExcel() {
 // 載入 IP 白名單
 export async function loadIPWhitelist() {
   const ipList = document.getElementById('ip-list');
-  ipList.innerHTML = '';
+  ipList.innerHTML = '<li class="text-center py-3">載入資料...</li>';
   try {
     const querySnapshot = await getDocs(collection(db, 'whitelist'));
+    ipList.innerHTML = '';
+    if (querySnapshot.empty) {
+      ipList.innerHTML = '<li class="text-center py-3 text-gray-600">尚無 IP 白名單</li>';
+      return;
+    }
     querySnapshot.forEach((doc) => {
       const ip = doc.data().ip;
       const li = document.createElement('li');
@@ -406,7 +410,7 @@ export async function loadIPWhitelist() {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
         const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
-        if (newIp) {
+        if (newIp && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(newIp)) {
           try {
             await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
             loadIPWhitelist();
@@ -414,6 +418,8 @@ export async function loadIPWhitelist() {
             console.error('更新 IP 失敗:', error);
             alert('更新失敗: ' + error.message);
           }
+        } else {
+          alert('請輸入有效的 IPv4 位址');
         }
       });
     });
