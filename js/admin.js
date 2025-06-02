@@ -1,3 +1,4 @@
+// admin.js
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
 import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
@@ -153,7 +154,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
   currentEndDate = endDate;
 
   try {
-    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
+    let q = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'), limit(20));
 
     // 應用篩選條件
     if (name) q = query(q, where('name', '==', name));
@@ -161,13 +162,34 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     if (startDate) q = query(q, where('timestamp', '>=', new Date(startDate).getTime()));
     if (endDate) q = query(q, where('timestamp', '<=', new Date(endDate).setHours(23, 59, 59, 999)));
 
-    q = query(q, limit(100)); // 增加限制以獲取更多紀錄
+    // 分頁邏輯
+    if (direction === 'next' && pageDocs[currentPage]) {
+      q = query(q, startAfter(pageDocs[currentPage].lastDoc));
+    } else if (direction === 'prev' && currentPage > 0 && pageDocs[currentPage - 1]) {
+      q = query(q, endBefore(pageDocs[currentPage - 1].firstDoc));
+    }
 
     const querySnapshot = await getDocs(q);
     let records = [];
-    querySnapshot.forEach((doc) => {
+    let firstDoc = null;
+    let lastDoc = null;
+
+    querySnapshot.forEach((doc, index) => {
+      if (index === 0) firstDoc = doc;
+      if (index === querySnapshot.size - 1) lastDoc = doc;
       records.push({ id: doc.id, ...doc.data() });
     });
+
+    // 更新分頁資料
+    if (direction === 'next') {
+      currentPage++;
+      pageDocs[currentPage] = { firstDoc, lastDoc };
+    } else if (direction === 'prev' && currentPage > 0) {
+      currentPage--;
+    } else if (direction === '') {
+      pageDocs = [{ firstDoc, lastDoc }];
+      currentPage = 0;
+    }
 
     // 整合紀錄
     const consolidatedRecords = {};
@@ -212,9 +234,13 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     });
 
     // 更新分頁資訊
-    recordStart.textContent = (currentPage * 20) + 1;
-    recordEnd.textContent = Math.min((currentPage + 1) * 20, displayRecords.length);
+    recordStart.textContent = currentPage * 20 + 1;
+    recordEnd.textContent = currentPage * 20 + Math.min(20, displayRecords.length);
     recordTotal.textContent = displayRecords.length;
+
+    // 控制分頁按鈕
+    prevPageBtn.disabled = currentPage === 0;
+    nextPageBtn.disabled = querySnapshot.size < 20;
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
