@@ -24,6 +24,7 @@ let currentStartDate = null;
 let currentEndDate = null;
 let pageDocs = [];
 let viewMode = 'raw';
+let allRecords = []; // 用於儲存所有紀錄以供匯出
 
 // DOM 元素
 const ipManagement = document.getElementById('ip-management');
@@ -204,53 +205,77 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
   try {
     let records = [];
+    allRecords = []; // 重置全域紀錄
 
     if (viewMode === 'raw') {
-      // 原始模式：使用分頁查詢
-      let q = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
+      // 原始模式：顯示分頁，匯出所有紀錄
+      let displayQuery = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
+      let allQuery = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
 
       // 應用篩選條件
-      if (name) q = query(q, where('name', '==', name));
-      if (location) q = query(q, where('location', '==', location));
-      if (startDate) q = query(q, where('timestamp', '>=', startDate));
-      if (endDate) q = query(q, where('timestamp', '<=', endDate + ' 23:59:59'));
+      if (name) {
+        displayQuery = query(displayQuery, where('name', '==', name));
+        allQuery = query(allQuery, where('name', '==', name));
+      }
+      if (location) {
+        displayQuery = query(displayQuery, where('location', '==', location));
+        allQuery = query(allQuery, where('location', '==', location));
+      }
+      if (startDate) {
+        displayQuery = query(displayQuery, where('timestamp', '>=', startDate));
+        allQuery = query(allQuery, where('timestamp', '>=', startDate));
+      }
+      if (endDate) {
+        displayQuery = query(displayQuery, where('timestamp', '<=', endDate + ' 23:59:59'));
+        allQuery = query(allQuery, where('timestamp', '<=', endDate + ' 23:59:59'));
+      }
 
-      // 分頁邏輯
+      // 分頁邏輯（僅用於顯示）
       if (direction === 'next' && pageDocs[currentPage] && pageDocs[currentPage].lastDoc) {
         currentPage++;
-        q = query(q, startAfter(pageDocs[currentPage - 1].lastDoc));
+        displayQuery = query(displayQuery, startAfter(pageDocs[currentPage - 1].lastDoc));
       } else if (direction === 'prev' && currentPage > 0) {
         currentPage--;
         if (currentPage === 0) {
-          q = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
-          if (name) q = query(q, where('name', '==', name));
-          if (location) q = query(q, where('location', '==', location));
-          if (startDate) q = query(q, where('timestamp', '>=', startDate));
-          if (endDate) q = query(q, where('timestamp', '<=', endDate + ' 23:59:59'));
+          displayQuery = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
+          if (name) displayQuery = query(displayQuery, where('name', '==', name));
+          if (location) displayQuery = query(displayQuery, where('location', '==', location));
+          if (startDate) displayQuery = query(displayQuery, where('timestamp', '>=', startDate));
+          if (endDate) displayQuery = query(displayQuery, where('timestamp', '<=', endDate + ' 23:59:59'));
         } else {
-          q = query(q, endBefore(pageDocs[currentPage].firstDoc));
+          displayQuery = query(displayQuery, endBefore(pageDocs[currentPage].firstDoc));
         }
       }
 
-      q = query(q, limit(20));
+      displayQuery = query(displayQuery, limit(20));
 
-      const querySnapshot = await getDocs(q);
-      querySnapshot.forEach((doc) => {
+      // 查詢顯示紀錄
+      const displaySnapshot = await getDocs(displayQuery);
+      displaySnapshot.forEach((doc) => {
         const data = doc.data();
         data.timestamp = parseTimestamp(data.timestamp);
         records.push({ id: doc.id, ...data });
       });
 
+      // 查詢所有紀錄（用於匯出）
+      const allSnapshot = await getDocs(allQuery);
+      allSnapshot.forEach((doc) => {
+        const data = doc.data();
+        data.timestamp = parseTimestamp(data.timestamp);
+        allRecords.push({ id: doc.id, ...data });
+      });
+
       if (records.length > 0) {
         pageDocs[currentPage] = {
-          firstDoc: querySnapshot.docs[0],
-          lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1]
+          firstDoc: displaySnapshot.docs[0],
+          lastDoc: displaySnapshot.docs[displaySnapshot.docs.length - 1]
         };
-        console.log(`加載 ${records.length} 條記錄`);
+        console.log(`顯示 ${records.length} 條記錄`);
       } else {
         pageDocs[currentPage] = { firstDoc: null, lastDoc: null };
         console.warn('沒有找到記錄');
       }
+      console.log(`匯出用 ${allRecords.length} 條記錄`);
     } else {
       // 整合模式：查詢所有符合條件的紀錄
       let q = query(collection(db, '2checkins'), orderBy('timestamp', 'asc'));
@@ -265,6 +290,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         data.timestamp = parseTimestamp(data.timestamp);
         records.push({ id: doc.id, ...data });
       });
+      allRecords = records; // 整合模式下，allRecords 等於 records
       console.log(`整合模式加載 ${records.length} 條記錄`);
     }
 
@@ -321,23 +347,18 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       });
 
       totalRecords = consolidatedRecords.length;
+      allRecords = displayRecords; // 整合模式下，匯出整合後的紀錄
       console.log('整合後記錄:', displayRecords);
     } else {
       // 原始模式
       displayRecords = records;
-      console.log('原始模式記錄:', displayRecords);
+      console.log('原始模式顯示紀錄:', displayRecords);
 
-      // 計算總記錄數（原始模式）
-      let totalQuery = query(collection(db, '2checkins'));
-      if (name) totalQuery = query(totalQuery, where('name', '==', name));
-      if (location) totalQuery = query(totalQuery, where('location', '==', location));
-      if (startDate) totalQuery = query(totalQuery, where('timestamp', '>=', startDate));
-      if (endDate) totalQuery = query(totalQuery, where('timestamp', '<=', endDate + ' 23:59:59'));
-      const totalSnapshot = await getDocs(totalQuery);
-      totalRecords = totalSnapshot.size;
+      // 計算總記錄數
+      totalRecords = allRecords.length;
     }
 
-    // 渲染記錄
+    // 渲染紀錄
     checkinRecords.innerHTML = '';
     displayRecords.forEach(record => {
       const row = document.createElement('tr');
@@ -379,7 +400,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 
     // 匯出 Excel 按鈕
     exportExcelBtn.removeEventListener('click', exportToExcel);
-    exportExcelBtn.addEventListener('click', () => exportToExcel(displayRecords));
+    exportExcelBtn.addEventListener('click', () => exportToExcel());
 
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
@@ -394,33 +415,44 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
 }
 
 // 匯出 Excel 功能
-function exportToExcel(records) {
-  const data = records.map(record => {
-    if (viewMode === 'consolidated') {
-      return {
-        姓名: record.name,
-        地點: record.location,
-        日期: formatDate(record.checkin ? record.checkin.timestamp : record.checkout.timestamp),
-        上班時間: record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
-        上班設備: record.checkin ? record.checkin.device : '-',
-        下班時間: record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
-        下班設備: record.checkout ? record.checkout.device : '-'
-      };
-    } else {
-      return {
-        姓名: record.name,
-        地點: record.location,
-        上班時間: record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
-        下班時間: record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
-        設備: record.device || '-'
-      };
-    }
-  });
+function exportToExcel() {
+  // 禁用按鈕以防止重複點擊
+  exportExcelBtn.disabled = true;
 
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '打卡紀錄');
-  XLSX.writeFile(wb, `打卡紀錄_${new Date().toISOString().split('T')[0]}.xlsx`);
+  try {
+    const data = allRecords.map(record => {
+      if (viewMode === 'consolidated') {
+        return {
+          姓名: record.name,
+          地點: record.location,
+          日期: formatDate(record.checkin ? record.checkin.timestamp : record.checkout.timestamp),
+          上班時間: record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+          上班設備: record.checkin ? record.checkin.device : '-',
+          下班時間: record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+          下班設備: record.checkout ? record.checkout.device : '-'
+        };
+      } else {
+        return {
+          姓名: record.name,
+          地點: record.location,
+          上班時間: record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+          下班時間: record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '-',
+          設備: record.device || '-'
+        };
+      }
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '打卡紀錄');
+    XLSX.writeFile(wb, `打卡紀錄_${new Date().toISOString().split('T')[0]}.xlsx`);
+  } catch (error) {
+    console.error('匯出 Excel 失敗:', error);
+    alert('匯出失敗: ' + error.message);
+  } finally {
+    // 恢復按鈕
+    exportExcelBtn.disabled = false;
+  }
 }
 
 // 載入 IP 白名單
@@ -451,7 +483,7 @@ export async function loadIPWhitelist() {
           loadIPWhitelist();
         } catch (error) {
           console.error('刪除 IP 失敗:', error);
-          alert('删除失敗: ' + error.message);
+          alert('刪除失敗: ' + error.message);
         }
       });
     });
@@ -459,7 +491,7 @@ export async function loadIPWhitelist() {
     document.querySelectorAll('.edit-ip-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
-        const newIp = prompt("請輸入新IP 位址:", btn.closest('li').querySelector('span').textContent);
+        const newIp = prompt("請輸入新的 IP 位址:", btn.closest('li').querySelector('span').textContent);
         if (newIp) {
           try {
             await updateDoc(doc(db, 'whitelist', id), { ip: newIp });
@@ -475,6 +507,5 @@ export async function loadIPWhitelist() {
     console.error('載入 IP 白名單失敗:', error);
     let errorMessage = error.code === 'permission-denied' ? '載入失敗: 權限不足，請確認您是管理員' : error.message;
     ipList.innerHTML = `<li class="text-red-600">${errorMessage}</li>`;
-    console.log('載入白 IP名');
   }
 }
