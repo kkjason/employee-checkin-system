@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
-import { collection, getDocs, query, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+import { collection, getDocs, query, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc, where } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -62,27 +62,27 @@ checkinManagementBtn.addEventListener('click', () => {
 });
 
 searchBtn.addEventListener('click', () => {
-  loadCheckinRecords(nameFilter.value, locationFilter.value, '', startDateInput.value, endDateInput.value);
+  loadCheckinRecords(nameFilter.value.trim(), locationFilter.value.trim(), '', startDateInput.value.trim(), endDateInput.value.trim());
 });
 
 prevPageBtn.addEventListener('click', () => {
-  loadCheckinRecords(nameFilter.value, locationFilter.value, 'prev', startDateInput.value, endDateInput.value);
+  loadCheckinRecords(nameFilter.value.trim(), locationFilter.value.trim(), 'prev', startDateInput.value.trim(), endDateInput.value.trim());
 });
 
 nextPageBtn.addEventListener('click', () => {
-  loadCheckinRecords(nameFilter.value, locationFilter.value, 'next', startDateInput.value, endDateInput.value);
+  loadCheckinRecords(nameFilter.value.trim(), locationFilter.value.trim(), 'next', startDateInput.value.trim(), endDateInput.value.trim());
 });
 
 rawRecordsBtn.addEventListener('click', () => {
   console.log('原始紀錄按鈕被點擊，設置 viewMode = raw');
   viewMode = 'raw';
-  loadCheckinRecords(nameFilter.value, locationFilter.value, '', startDateInput.value, endDateInput.value);
+  loadCheckinRecords(nameFilter.value.trim(), locationFilter.value.trim(), '', startDateInput.value.trim(), endDateInput.value.trim());
 });
 
 consolidatedRecordsBtn.addEventListener('click', () => {
   console.log('出勤整合按鈕被點擊，設置 viewMode = consolidated');
   viewMode = 'consolidated';
-  loadCheckinRecords(nameFilter.value, locationFilter.value, '', startDateInput.value, endDateInput.value);
+  loadCheckinRecords(nameFilter.value.trim(), locationFilter.value.trim(), '', startDateInput.value.trim(), endDateInput.value.trim());
 });
 
 // 等待 DOM 載入完成
@@ -265,6 +265,11 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
     let records = [];
     allRecords = [];
 
+    // 驗證 where 是否可用
+    if (typeof where !== 'function') {
+      throw new Error('Firestore "where" 函數未定義，請檢查 Firebase SDK 導入');
+    }
+
     if (viewMode === 'raw') {
       let displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
       let allQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
@@ -418,38 +423,42 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
 
     // 渲染紀錄
     checkinRecords.innerHTML = '';
-    displayRecords.forEach(record => {
-      const row = document.createElement('tr');
-      if (viewMode === 'consolidated') {
-        const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-';
-        const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
-        row.innerHTML = `
-          <td class="py-3 px-4 border-b">${record.name}</td>
-          <td class="py-3 px-4 border-b">${record.location}</td>
-          <td class="py-3 px-4 border-b">${record.date}</td>
-          <td class="py-3 px-4 border-b">${checkinTime}</td>
-          <td class="py-3 px-4 border-b">${checkoutTime}</td>
-        `;
-      } else {
-        const checkinTime = record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-';
-        const checkoutTime = record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-';
-        row.innerHTML = `
-          <td class="py-3 px-4 border-b">${record.name}</td>
-          <td class="py-3 px-4 border-b">${record.location}</td>
-          <td class="py-3 px-4 border-b">${formatDate(record.timestamp)}</td>
-          <td class="py-3 px-4 border-b">${checkinTime}</td>
-          <td class="py-3 px-4 border-b">${checkoutTime}</td>
-        `;
-      }
-      checkinRecords.appendChild(row);
-    });
+    if (displayRecords.length === 0) {
+      checkinRecords.innerHTML = '<tr><td colspan="5" class="py-3 px-4 text-center text-gray-600">無符合條件的記錄</td></tr>';
+    } else {
+      displayRecords.forEach(record => {
+        const row = document.createElement('tr');
+        if (viewMode === 'consolidated') {
+          const checkinTime = record.checkin ? new Date(record.checkin.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkin.device}` : '-';
+          const checkoutTime = record.checkout ? new Date(record.checkout.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.checkout.device}` : '-';
+          row.innerHTML = `
+            <td class="py-3 px-4 border-b">${record.name}</td>
+            <td class="py-3 px-4 border-b">${record.location}</td>
+            <td class="py-3 px-4 border-b">${record.date}</td>
+            <td class="py-3 px-4 border-b">${checkinTime}</td>
+            <td class="py-3 px-4 border-b">${checkoutTime}</td>
+          `;
+        } else {
+          const checkinTime = record.type === 'checkin' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-';
+          const checkoutTime = record.type === 'checkout' ? new Date(record.timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) + `<br>${record.device || '-'}` : '-';
+          row.innerHTML = `
+            <td class="py-3 px-4 border-b">${record.name}</td>
+            <td class="py-3 px-4 border-b">${record.location}</td>
+            <td class="py-3 px-4 border-b">${formatDate(record.timestamp)}</td>
+            <td class="py-3 px-4 border-b">${checkinTime}</td>
+            <td class="py-3 px-4 border-b">${checkoutTime}</td>
+          `;
+        }
+        checkinRecords.appendChild(row);
+      });
+    }
 
     // 更新分頁資訊
     if (viewMode === 'raw') {
-      recordStart.textContent = (currentPage * 20) + 1;
-      recordEnd.textContent = Math.min((currentPage + 1) * 20, totalRecords);
+      recordStart.textContent = totalRecords === 0 ? 0 : (currentPage * 20) + 1;
+      recordEnd.textContent = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * 20, totalRecords);
     } else {
-      recordStart.textContent = 1;
+      recordStart.textContent = totalRecords === 0 ? 0 : 1;
       recordEnd.textContent = totalRecords;
     }
     recordTotal.textContent = totalRecords;
@@ -468,6 +477,9 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       errorMessage = '權限不足，請確認您是管理員';
       window.location.assign('/2admin_login.html');
       return;
+    }
+    if (error.message.includes('where is not defined')) {
+      errorMessage = 'Firestore SDK 載入失敗，請檢查網絡連線或 Firebase CDN 是否正確';
     }
     checkinRecords.innerHTML = `<tr><td colspan="5" class="py-3 px-4 text-red-600 text-center">載入失敗: ${errorMessage}</td></tr>`;
   }
