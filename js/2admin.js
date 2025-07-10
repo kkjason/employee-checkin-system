@@ -269,7 +269,7 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       let displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
       let allQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
 
-      // 僅對 timestamp 應用範圍查詢，避免複合索引
+      // 僅在用戶指定時應用 timestamp 範圍查詢
       if (startDate) {
         displayQuery = query(displayQuery, where('timestamp', '>=', startDate));
         allQuery = query(allQuery, where('timestamp', '>=', startDate));
