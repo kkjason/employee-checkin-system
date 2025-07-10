@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
-import { collection, getDocs, query, where, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+import { collection, getDocs, query, orderBy, limit, startAfter, endBefore, deleteDoc, doc, updateDoc, getFirestore, addDoc } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
 // Firebase 配置
 const firebaseConfig = {
@@ -269,15 +269,7 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       let displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
       let allQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
 
-      // 應用篩選條件
-      if (name) {
-        displayQuery = query(displayQuery, where('name', '==', name));
-        allQuery = query(allQuery, where('name', '==', name));
-      }
-      if (location) {
-        displayQuery = query(displayQuery, where('location', '==', location));
-        allQuery = query(allQuery, where('location', '==', location));
-      }
+      // 僅對 timestamp 應用範圍查詢，避免複合索引
       if (startDate) {
         displayQuery = query(displayQuery, where('timestamp', '>=', startDate));
         allQuery = query(allQuery, where('timestamp', '>=', startDate));
@@ -295,8 +287,6 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
         currentPage--;
         if (currentPage === 0) {
           displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
-          if (name) displayQuery = query(displayQuery, where('name', '==', name));
-          if (location) displayQuery = query(displayQuery, where('location', '==', location));
           if (startDate) displayQuery = query(displayQuery, where('timestamp', '>=', startDate));
           if (endDate) displayQuery = query(displayQuery, where('timestamp', '<=', endDate + ' 23:59:59'));
         } else {
@@ -311,7 +301,10 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       displaySnapshot.forEach((doc) => {
         const data = doc.data();
         data.timestamp = parseTimestamp(data.timestamp);
-        records.push({ id: doc.id, ...data });
+        // 客戶端過濾 name 和 location
+        if ((name === '' || data.name === name) && (location === '' || data.location === location)) {
+          records.push({ id: doc.id, ...data });
+        }
       });
 
       // 查詢所有紀錄（用於匯出）
@@ -319,7 +312,9 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       allSnapshot.forEach((doc) => {
         const data = doc.data();
         data.timestamp = parseTimestamp(data.timestamp);
-        allRecords.push({ id: doc.id, ...data });
+        if ((name === '' || data.name === name) && (location === '' || data.location === location)) {
+          allRecords.push({ id: doc.id, ...data });
+        }
       });
 
       if (records.length > 0) {
@@ -336,8 +331,6 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
     } else {
       // 整合模式：查詢所有符合條件的紀錄
       let q = query(collection(db, 'checkins'), orderBy('timestamp', 'asc'));
-      if (name) q = query(q, where('name', '==', name));
-      if (location) q = query(q, where('location', '==', location));
       if (startDate) q = query(q, where('timestamp', '>=', startDate));
       if (endDate) q = query(q, where('timestamp', '<=', endDate + ' 23:59:59'));
 
@@ -345,7 +338,10 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         data.timestamp = parseTimestamp(data.timestamp);
-        records.push({ id: doc.id, ...data });
+        // 客戶端過濾 name 和 location
+        if ((name === '' || data.name === name) && (location === '' || data.location === location)) {
+          records.push({ id: doc.id, ...data });
+        }
       });
 
       // 合併60分鐘內的重複打卡記錄
@@ -468,9 +464,7 @@ async function loadCheckinRecords(name = '', location = '', direction = '', star
   } catch (error) {
     console.error('載入打卡紀錄失敗:', error);
     let errorMessage = error.message;
-    if (error.code === 'failed-precondition' && error.message.includes('requires an index')) {
-      errorMessage = `查詢需要索引，請在 Firebase 控制台中創建索引：${error.message.match(/https:\/\/[^\s]+/)?.[0] || error.message}`;
-    } else if (error.code === 'permission-denied') {
+    if (error.code === 'permission-denied') {
       errorMessage = '權限不足，請確認您是管理員';
       window.location.assign('/2admin_login.html');
       return;
