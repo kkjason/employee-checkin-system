@@ -152,4 +152,4 @@ function parseTimestamp(timestamp) {
   try {
     // 處理 ISO 格式（例如 "2025-06-02T07:
 
-System: * Today's date and time is 08:54 PM CST on Thursday, July 10, 2025.
+//System: * Today's date and time is 08:54 PM CST on Thursday, July 10, 2025.
