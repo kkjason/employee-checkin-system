@@ -185,7 +185,7 @@ function parseTimestamp(timestamp) {
   }
 }
 
-// 格式化日期為 YYYY-MM-DD
+// formats date as YYYY-MM-DD
 function formatDate(timestamp) {
   const millis = parseTimestamp(timestamp);
   return new Date(millis).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replace(/\//g, '-');
@@ -223,8 +223,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     allRecords = [];
 
     if (viewMode === 'raw') {
-      let displayQuery = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
-      let allQuery = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
+      let displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc')); // 修改為 'checkins'
+      let allQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc')); // 修改為 'checkins'
 
       // 應用篩選條件
       if (name) {
@@ -251,7 +251,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       } else if (direction === 'prev' && currentPage > 0) {
         currentPage--;
         if (currentPage === 0) {
-          displayQuery = query(collection(db, '2checkins'), orderBy('timestamp', 'desc'));
+          displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc')); // 修改為 'checkins'
           if (name) displayQuery = query(displayQuery, where('name', '==', name));
           if (location) displayQuery = query(displayQuery, where('location', '==', location));
           if (startDate) displayQuery = query(displayQuery, where('timestamp', '>=', startDate));
@@ -292,7 +292,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       console.log(`匯出用 ${allRecords.length} 條記錄`);
     } else {
       // 整合模式：查詢所有符合條件的紀錄
-      let q = query(collection(db, '2checkins'), orderBy('timestamp', 'asc'));
+      let q = query(collection(db, 'checkins'), orderBy('timestamp', 'asc')); // 修改為 'checkins'
       if (name) q = query(q, where('name', '==', name));
       if (location) q = query(q, where('location', '==', location));
       if (startDate) q = query(q, where('timestamp', '>=', startDate));
