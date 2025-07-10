@@ -185,10 +185,53 @@ function parseTimestamp(timestamp) {
   }
 }
 
-// formats date as YYYY-MM-DD
+// 格式化日期為 YYYY-MM-DD
 function formatDate(timestamp) {
   const millis = parseTimestamp(timestamp);
   return new Date(millis).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replace(/\//g, '-');
+}
+
+// 合併重複打卡記錄（60分鐘內）
+function mergeDuplicateRecords(records) {
+  const mergedRecords = [];
+  const groupedByKey = {};
+
+  // 按姓名、地點、日期、類型分組
+  records.forEach(record => {
+    const date = formatDate(record.timestamp);
+    const key = `${record.name}_${record.location}_${date}_${record.type}`;
+    if (!groupedByKey[key]) {
+      groupedByKey[key] = [];
+    }
+    groupedByKey[key].push(record);
+  });
+
+  // 對每組記錄進行合併
+  Object.values(groupedByKey).forEach(group => {
+    if (group.length === 1) {
+      mergedRecords.push(group[0]);
+      return;
+    }
+
+    // 按時間排序
+    group.sort((a, b) => a.timestamp - b.timestamp);
+
+    // 合併60分鐘內的重複記錄（保留第一筆）
+    let lastRecord = group[0];
+    mergedRecords.push(lastRecord);
+
+    for (let i = 1; i < group.length; i++) {
+      const current = group[i];
+      const timeDiff = (current.timestamp - lastRecord.timestamp) / (1000 * 60); // 分鐘差
+      if (timeDiff > 60) {
+        mergedRecords.push(current);
+        lastRecord = current;
+      }
+    }
+  });
+
+  // 按時間降序排序
+  return mergedRecords.sort((a, b) => b.timestamp - a.timestamp);
 }
 
 // 加載打卡紀錄的函數
@@ -223,8 +266,8 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
     allRecords = [];
 
     if (viewMode === 'raw') {
-      let displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc')); // 修改為 'checkins'
-      let allQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc')); // 修改為 'checkins'
+      let displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
+      let allQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
 
       // 應用篩選條件
       if (name) {
@@ -251,7 +294,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       } else if (direction === 'prev' && currentPage > 0) {
         currentPage--;
         if (currentPage === 0) {
-          displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc')); // 修改為 'checkins'
+          displayQuery = query(collection(db, 'checkins'), orderBy('timestamp', 'desc'));
           if (name) displayQuery = query(displayQuery, where('name', '==', name));
           if (location) displayQuery = query(displayQuery, where('location', '==', location));
           if (startDate) displayQuery = query(displayQuery, where('timestamp', '>=', startDate));
@@ -279,6 +322,10 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         allRecords.push({ id: doc.id, ...data });
       });
 
+      // 合併重複打卡記錄
+      records = mergeDuplicateRecords(records);
+      allRecords = mergeDuplicateRecords(allRecords);
+
       if (records.length > 0) {
         pageDocs[currentPage] = {
           firstDoc: displaySnapshot.docs[0],
@@ -292,7 +339,7 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
       console.log(`匯出用 ${allRecords.length} 條記錄`);
     } else {
       // 整合模式：查詢所有符合條件的紀錄
-      let q = query(collection(db, 'checkins'), orderBy('timestamp', 'asc')); // 修改為 'checkins'
+      let q = query(collection(db, 'checkins'), orderBy('timestamp', 'asc'));
       if (name) q = query(q, where('name', '==', name));
       if (location) q = query(q, where('location', '==', location));
       if (startDate) q = query(q, where('timestamp', '>=', startDate));
@@ -304,6 +351,9 @@ export async function loadCheckinRecords(name = '', location = '', direction = '
         data.timestamp = parseTimestamp(data.timestamp);
         records.push({ id: doc.id, ...data });
       });
+
+      // 合併重複打卡記錄
+      records = mergeDuplicateRecords(records);
       allRecords = records;
       console.log(`整合模式加載 ${records.length} 條記錄`);
     }
