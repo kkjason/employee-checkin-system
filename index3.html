@@ -1,81 +1,34 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <title>打卡系統 index3（防連打）</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>打卡系統 index3</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-light">
-  <div class="container py-4">
-    <h2>員工打卡系統（index3）</h2>
+<body>
+  <div class="container">
+    <h1>打卡系統 - index3</h1>
 
-    <div class="mb-3">
-      <label for="name" class="form-label">姓名</label>
-      <input type="text" id="name" class="form-control" placeholder="請輸入您的姓名" />
+    <div id="user-info" style="display:none;">
+      <p>歡迎，<span id="user-name"></span></p>
+      <button id="checkin-btn">打卡</button>
+      <button id="logout-btn">登出</button>
     </div>
 
-    <button id="checkinBtn" class="btn btn-primary btn-lg mb-3">打卡</button>
-    <div id="message" class="mt-2 text-danger"></div>
+    <div id="login-container">
+      <button id="login-btn">使用 Google 登入</button>
+    </div>
 
-    <hr />
-    <h4>最近 4 筆打卡紀錄</h4>
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>時間</th>
-          <th>姓名</th>
-        </tr>
-      </thead>
-      <tbody id="records"></tbody>
-    </table>
+    <div id="records-container" style="margin-top: 20px;">
+      <h3>最近 4 筆打卡紀錄</h3>
+      <ul id="records-list"></ul>
+    </div>
   </div>
 
-  <script>
-    const btn = document.getElementById('checkinBtn');
-    const message = document.getElementById('message');
-    const recordsTable = document.getElementById('records');
-
-    btn.addEventListener('click', async () => {
-      const name = document.getElementById('name').value.trim();
-      if (!name) {
-        message.textContent = '請輸入姓名';
-        return;
-      }
-      btn.disabled = true;
-      message.textContent = '打卡中...';
-
-      try {
-        const res = await fetch('/.netlify/functions/checkin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name }),
-        });
-        const data = await res.json();
-        message.textContent = data.message;
-        loadLatest();
-      } catch (err) {
-        message.textContent = '打卡失敗，請稍後再試';
-      } finally {
-        setTimeout(() => (btn.disabled = false), 3000);
-      }
-    });
-
-    async function loadLatest() {
-      const res = await fetch('/.netlify/functions/latest');
-      const data = await res.json();
-      recordsTable.innerHTML = '';
-      data.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${new Date(r.time).toLocaleString()}</td><td>${r.name}</td>`;
-        recordsTable.appendChild(tr);
-      });
-    }
-
-    loadLatest();
-  </script>
+  <script src="index3.js"></script>
 </body>
 </html>
