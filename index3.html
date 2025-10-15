@@ -1,31 +1,31 @@
+<!-- index3.html -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>打卡系統 index3</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 </head>
 <body>
   <div class="container">
-    <h1>打卡系統 - index3</h1>
+    <h1>打卡系統（index3）</h1>
+    <div id="login-container">
+      <button id="login-btn">Google 登入</button>
+    </div>
 
-    <div id="user-info" style="display:none;">
-      <p>歡迎，<span id="user-name"></span></p>
+    <div id="user-container" style="display: none;">
+      <p id="welcome-text"></p>
       <button id="checkin-btn">打卡</button>
       <button id="logout-btn">登出</button>
     </div>
 
-    <div id="login-container">
-      <button id="login-btn">使用 Google 登入</button>
-    </div>
-
-    <div id="records-container" style="margin-top: 20px;">
-      <h3>最近 4 筆打卡紀錄</h3>
-      <ul id="records-list"></ul>
+    <div id="record-container">
+      <h3>打卡紀錄</h3>
+      <ul id="record-list"></ul>
     </div>
   </div>
 
