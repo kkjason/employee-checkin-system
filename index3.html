@@ -1,142 +1,348 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>打卡系統 index3</title>
-<link rel="stylesheet" href="style.css">
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>員工打卡系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
+  <style>
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 400px;
+      text-align: center;
+    }
+    .modal button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background-color: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .modal button:hover {
+      background-color: #4338ca;
+    }
+    input[readonly] {
+      background-color: #f3f4f6;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
-<body>
-<div class="container">
-  <h1>打卡系統 - index3</h1>
+<body class="bg-gradient-to-r from-blue-100 to-indigo-100 min-h-screen p-4">
+  <div class="container mx-auto">
+    <!-- 登入容器 -->
+    <div id="login-container" class="text-center text-gray-700">載入中...</div>
 
-  <!-- 登入區域 -->
-  <div id="login-container">
-    <button id="login-btn">Google 登入</button>
+    <!-- 打卡頁面容器 -->
+    <div id="checkin-container" class="hidden"></div>
+
+    <!-- 提示對話框 -->
+    <div id="alert-modal" class="modal">
+      <div class="modal-content">
+        <p id="alert-message"></p>
+        <button id="alert-close">確定</button>
+      </div>
+    </div>
   </div>
 
-  <!-- 使用者資訊與打卡區 -->
-  <div id="user-container" style="display:none;">
-    <p id="welcome-text"></p>
-    <button id="checkin-btn">打卡</button>
-    <button id="logout-btn">登出</button>
-  </div>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+    import { getFirestore, collection, getDocs, query, addDoc, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+    import { showLoginForm, generateDeviceFingerprint, getTranslations, getUserName } from '/js/device_binding_flow.js';
 
-  <!-- 打卡紀錄區 -->
-  <div id="record-container">
-    <h3>最近打卡紀錄</h3>
-    <ul id="record-list"></ul>
-  </div>
-</div>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCv1ywEy0oaL8FNBLAEO-Ban5lMs26Y_gY",
+      authDomain: "employee-checkin-system.firebaseapp.com",
+      projectId: "employee-checkin-system",
+      storageBucket: "employee-checkin-system.firebasestorage.app",
+      messagingSenderId: "646412258577",
+      appId: "1:646412258577:web:7f32d3c069c415c9b190b0"
+    };
 
-<script>
-// ======================= Firebase 初始化 =======================
-const firebaseConfig = {
-  apiKey: "你的 API KEY",
-  authDomain: "你的 AUTH DOMAIN",
-  projectId: "你的 PROJECT ID",
-};
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
 
-// ======================= DOM 元素 =======================
-const loginBtn = document.getElementById('login-btn');
-const logoutBtn = document.getElementById('logout-btn');
-const checkinBtn = document.getElementById('checkin-btn');
-const welcomeText = document.getElementById('welcome-text');
-const userContainer = document.getElementById('user-container');
-const loginContainer = document.getElementById('login-container');
-const recordList = document.getElementById('record-list');
+    const loginContainer = document.getElementById('login-container');
+    const checkinContainer = document.getElementById('checkin-container');
+    const alertModal = document.getElementById('alert-modal');
+    const alertMessage = document.getElementById('alert-message');
+    const alertClose = document.getElementById('alert-close');
 
-// ======================= 狀態變數 =======================
-let currentUser = null;
+    function showAlert(messages) {
+      alertMessage.innerHTML = `
+        <p>${messages.zh}</p>
+        <p>${messages.vi}</p>
+        <p>${messages.en}</p>
+      `;
+      alertModal.style.display = 'flex';
+    }
 
-// 🆕 防重複打卡變數
-let lastCheckinTime = 0; // 毫秒
-
-// ======================= Google 登入 =======================
-loginBtn.addEventListener('click', () => {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider);
-});
-
-// ======================= 登出 =======================
-logoutBtn.addEventListener('click', () => {
-  auth.signOut();
-});
-
-// ======================= 監聽登入狀態 =======================
-auth.onAuthStateChanged(user => {
-  if(user){
-    currentUser = user;
-    welcomeText.textContent = `歡迎，${user.displayName}`;
-    userContainer.style.display = 'block';
-    loginContainer.style.display = 'none';
-    loadRecords();
-  } else {
-    currentUser = null;
-    userContainer.style.display = 'none';
-    loginContainer.style.display = 'block';
-    recordList.innerHTML = '';
-  }
-});
-
-// ======================= 打卡功能 =======================
-checkinBtn.addEventListener('click', async () => {
-  if(!currentUser) return;
-
-  const now = Date.now();
-  const interval = 30000; // 30 秒內禁止重複打卡
-
-  if(now - lastCheckinTime < interval){
-    alert('請勿連續打卡，請稍後再試');
-    return;
-  }
-
-  lastCheckinTime = now; // 更新最後打卡時間
-
-  try{
-    await db.collection('checkins').add({
-      uid: currentUser.uid,
-      name: currentUser.displayName,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    alertClose.addEventListener('click', () => {
+      alertModal.style.display = 'none';
     });
-    alert('打卡成功');
-    loadRecords();
-  } catch(e){
-    console.error('打卡失敗', e);
-    alert('打卡失敗，請稍後再試');
-  }
-});
 
-// ======================= 讀取打卡紀錄 =======================
-async function loadRecords(){
-  if(!currentUser) return;
+    async function getUserIP() {
+      try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        console.log('獲取到的 IP:', data.ip);
+        return data.ip;
+      } catch (error) {
+        console.error('獲取 IP 失敗:', error);
+        showAlert({
+          zh: '無法獲取您的 IP 地址，請檢查網絡',
+          vi: 'Không thể lấy địa chỉ IP của bạn, vui lòng kiểm tra mạng',
+          en: 'Unable to retrieve your IP address, please check your network'
+        });
+        return null;
+      }
+    }
 
-  const snapshot = await db.collection('checkins')
-    .where('uid','==',currentUser.uid)
-    .orderBy('timestamp','desc')
-    .limit(10)
-    .get();
+    async function isIPWhitelisted(ip) {
+      if (!ip) return false;
+      try {
+        const snapshot = await getDocs(collection(db, 'whitelist'));
+        let isWhitelisted = false;
 
-  recordList.innerHTML = '';
-  snapshot.forEach(doc=>{
-    const data = doc.data();
-    const li = document.createElement('li');
-    const time = data.timestamp ? data.timestamp.toDate().toLocaleString('zh-TW') : '尚未同步時間';
-    li.textContent = `${time} - ${data.name}`;
-    recordList.appendChild(li);
-  });
-}
+        snapshot.forEach(doc => {
+          const whitelistIP = doc.data().ip;
+          if (whitelistIP === ip) {
+            isWhitelisted = true;
+          } else if (whitelistIP.includes('/')) {
+            const [subnet, prefix] = whitelistIP.split('/');
+            if (isInSubnet(ip, subnet, parseInt(prefix))) {
+              isWhitelisted = true;
+            }
+          } else if (whitelistIP.endsWith('.0')) {
+            const subnet = whitelistIP;
+            if (isInSubnet(ip, subnet, 24)) {
+              isWhitelisted = true;
+            }
+          }
+        });
 
-// ======================= 其他原本功能 =======================
-// 以下保留原本 index.html 的其他程式碼、UI 或事件綁定
-// 例如：顯示所有使用者打卡紀錄、管理員功能、樣式調整、提示訊息等
-// ... 這裡請保留 index.html 的完整 400+ 行邏輯
-</script>
+        console.log(`IP ${ip} 是否在白名單:`, isWhitelisted);
+        return isWhitelisted;
+      } catch (error) {
+        console.error('檢查 IP 白名單失敗:', error);
+        return false;
+      }
+    }
+
+    function isInSubnet(ip, subnet, prefix) {
+      const ipToInt = ipToInteger(ip);
+      const subnetToInt = ipToInteger(subnet);
+      const mask = prefix ? ~0 << (32 - prefix) : 0xffffffff;
+      return (ipToInt & mask) === (subnetToInt & mask);
+    }
+
+    function ipToInteger(ip) {
+      return ip.split('.').reduce((int, oct) => (int << 8) + parseInt(oct, 10), 0) >>> 0;
+    }
+
+    async function hasRecentCheckin(userId, type) {
+      const q = query(
+        collection(db, 'checkins'),
+        orderBy('timestamp', 'desc'),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        if (data.userId === userId && data.type === type) {
+          const lastTime = new Date(data.timestamp);
+          const now = new Date();
+          const diffMinutes = (now - lastTime) / 1000 / 60;
+          if (diffMinutes < 1) { // 1 分鐘內禁止連續打卡
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    async function renderCheckinForm(lang = 'zh') {
+      const t = getTranslations(lang);
+      const userId = auth.currentUser?.uid;
+      let name = '';
+      if (userId) {
+        name = await getUserName(db, userId) || '';
+      }
+
+      checkinContainer.innerHTML = `
+        <div class="flex justify-center mb-4">
+          <button class="lang-btn px-4 py-2 mx-1 rounded-lg ${lang === 'zh' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}" data-lang="zh">中文</button>
+          <button class="lang-btn px-4 py-2 mx-1 rounded-lg ${lang === 'vi' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}" data-lang="vi">Tiếng Việt</button>
+          <button class="lang-btn px-4 py-2 mx-1 rounded-lg ${lang === 'en' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}" data-lang="en">English</button>
+        </div>
+        <h1 class="text-3xl font-bold text-indigo-700 mb-6 text-center">${t.checkinTitle}</h1>
+        <div class="bg-white p-6 rounded-xl shadow-lg max-w-md mx-auto">
+          <h2 class="text-2xl font-bold text-indigo-700 mb-4">${t.checkinHeader}</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-gray-700 mb-1">${t.nameLabel}</label>
+              <input type="text" id="name-input" value="${name}" readonly class="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed" placeholder="${t.namePlaceholder}">
+            </div>
+            <div>
+              <label class="block text-gray-700 mb-1">${t.locationLabel}</label>
+              <select id="location-input" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <option value="宏匯">${t.locationOption}</option>
+              </select>
+            </div>
+            <button id="checkin-btn" class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200">${t.checkinBtn}</button>
+            <button id="checkout-btn" class="w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition-colors duration-200">${t.checkoutBtn}</button>
+            <button id="logout-btn" class="w-full bg-gray-600 text-white p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200 mt-4">${t.logoutBtn}</button>
+          </div>
+        </div>
+      `;
+
+      document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const newLang = btn.dataset.lang;
+          localStorage.setItem('language', newLang);
+          renderCheckinForm(newLang);
+        });
+      });
+
+      const nameInput = document.getElementById('name-input');
+      const locationInput = document.getElementById('location-input');
+      const checkinBtn = document.getElementById('checkin-btn');
+      const checkoutBtn = document.getElementById('checkout-btn');
+      const logoutBtn = document.getElementById('logout-btn');
+
+      checkinBtn.addEventListener('click', async () => {
+        const location = locationInput.value;
+        const deviceFingerprint = await generateDeviceFingerprint();
+        const userIP = await getUserIP();
+        const name = nameInput.value;
+
+        if (!location) {
+          showAlert({ zh: t.emptyLocation, vi: getTranslations('vi').emptyLocation, en: getTranslations('en').emptyLocation });
+          return;
+        }
+        if (!name) {
+          showAlert({ zh: t.nameNotFound, vi: getTranslations('vi').nameNotFound, en: getTranslations('en').nameNotFound });
+          return;
+        }
+        if (!userIP) {
+          showAlert({ zh: t.ipError, vi: getTranslations('vi').ipError, en: getTranslations('en').ipError });
+          return;
+        }
+        const isWhitelisted = await isIPWhitelisted(userIP);
+        if (!isWhitelisted) {
+          showAlert({ zh: t.wifiError, vi: getTranslations('vi').wifiError, en: getTranslations('en').wifiError });
+          return;
+        }
+
+        if (await hasRecentCheckin(auth.currentUser.uid, 'checkin')) {
+          showAlert({ zh: '請勿連續打卡', vi: 'Vui lòng không chấm công liên tục', en: 'Please do not check in repeatedly' });
+          return;
+        }
+
+        try {
+          await addDoc(collection(db, 'checkins'), {
+            name,
+            location,
+            type: 'checkin',
+            timestamp: new Date().toISOString(),
+            device: deviceFingerprint,
+            userId: auth.currentUser.uid,
+            ip: userIP
+          });
+          showAlert({ zh: t.checkinSuccess, vi: getTranslations('vi').checkinSuccess, en: getTranslations('en').checkinSuccess });
+        } catch (error) {
+          console.error('打卡失敗:', error);
+          showAlert({ zh: `${t.checkinFailed}: ${error.message}`, vi: `${getTranslations('vi').checkinFailed}: ${error.message}`, en: `${getTranslations('en').checkinFailed}: ${error.message}` });
+        }
+      });
+
+      checkoutBtn.addEventListener('click', async () => {
+        const location = locationInput.value;
+        const deviceFingerprint = await generateDeviceFingerprint();
+        const userIP = await getUserIP();
+        const name = nameInput.value;
+
+        if (!location) {
+          showAlert({ zh: t.emptyLocation, vi: getTranslations('vi').emptyLocation, en: getTranslations('en').emptyLocation });
+          return;
+        }
+        if (!name) {
+          showAlert({ zh: t.nameNotFound, vi: getTranslations('vi').nameNotFound, en: getTranslations('en').nameNotFound });
+          return;
+        }
+        if (!userIP) {
+          showAlert({ zh: t.ipError, vi: getTranslations('vi').ipError, en: getTranslations('en').ipError });
+          return;
+        }
+        const isWhitelisted = await isIPWhitelisted(userIP);
+        if (!isWhitelisted) {
+          showAlert({ zh: t.wifiError, vi: getTranslations('vi').wifiError, en: getTranslations('en').wifiError });
+          return;
+        }
+
+        if (await hasRecentCheckin(auth.currentUser.uid, 'checkout')) {
+          showAlert({ zh: '請勿連續打卡', vi: 'Vui lòng không chấm công liên tục', en: 'Please do not check out repeatedly' });
+          return;
+        }
+
+        try {
+          await addDoc(collection(db, 'checkins'), {
+            name,
+            location,
+            type: 'checkout',
+            timestamp: new Date().toISOString(),
+            device: deviceFingerprint,
+            userId: auth.currentUser.uid,
+            ip: userIP
+          });
+          showAlert({ zh: t.checkoutSuccess, vi: getTranslations('vi').checkoutSuccess, en: getTranslations('en').checkoutSuccess });
+        } catch (error) {
+          console.error('打卡失敗:', error);
+          showAlert({ zh: `${t.checkinFailed}: ${error.message}`, vi: `${getTranslations('vi').checkinFailed}: ${error.message}`, en: `${getTranslations('en').checkinFailed}: ${error.message}` });
+        }
+      });
+
+      logoutBtn.addEventListener('click', () => {
+        signOut(auth).then(() => {
+          window.location.reload();
+        }).catch((error) => {
+          showAlert({ zh: `${t.logoutFailed}: ${error.message}`, vi: `${getTranslations('vi').logoutFailed}: ${error.message}`, en: `${getTranslations('en').logoutFailed}: ${error.message}` });
+        });
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      onAuthStateChanged(auth, async (user) => {
+        const lang = localStorage.getItem('language') || 'zh';
+        if (user) {
+          loginContainer.classList.add('hidden');
+          checkinContainer.classList.remove('hidden');
+          await renderCheckinForm(lang);
+        } else {
+          loginContainer.classList.remove('hidden');
+          checkinContainer.classList.add('hidden');
+          showLoginForm(auth, db, lang);
+        }
+      });
+    });
+  </script>
 </body>
 </html>
