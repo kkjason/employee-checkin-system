@@ -1,24 +1,25 @@
 // index3.js
-// 初始化 Firebase
+
+// ✅ Firebase 初始化（沿用你原本的設定）
 const firebaseConfig = {
   apiKey: "你的 API KEY",
   authDomain: "你的 AUTH DOMAIN",
   projectId: "你的 PROJECT ID",
 };
 firebase.initializeApp(firebaseConfig);
-
 const auth = firebase.auth();
 const db = firebase.firestore();
 
 const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const checkinBtn = document.getElementById('checkin-btn');
-const userInfoDiv = document.getElementById('user-info');
-const userNameSpan = document.getElementById('user-name');
-const recordsList = document.getElementById('records-list');
+const welcomeText = document.getElementById('welcome-text');
+const userContainer = document.getElementById('user-container');
+const loginContainer = document.getElementById('login-container');
+const recordList = document.getElementById('record-list');
 
 let currentUser = null;
-let lastCheckinTime = 0; // 儲存上次打卡時間（毫秒）
+let lastCheckinTimestamp = 0;  // 🆕 紀錄上次打卡時間（毫秒）
 
 // Google 登入
 loginBtn.addEventListener('click', () => {
@@ -35,27 +36,27 @@ logoutBtn.addEventListener('click', () => {
 auth.onAuthStateChanged(user => {
   if (user) {
     currentUser = user;
-    userInfoDiv.style.display = 'block';
-    loginBtn.style.display = 'none';
-    userNameSpan.textContent = user.displayName;
-
-    // 載入最近4筆紀錄
-    loadRecentRecords();
+    welcomeText.textContent = `歡迎，${user.displayName}`;
+    userContainer.style.display = 'block';
+    loginContainer.style.display = 'none';
+    loadRecords();
   } else {
     currentUser = null;
-    userInfoDiv.style.display = 'none';
-    loginBtn.style.display = 'block';
-    recordsList.innerHTML = '';
+    userContainer.style.display = 'none';
+    loginContainer.style.display = 'block';
+    recordList.innerHTML = '';
   }
 });
 
-// 打卡按鈕
+// 🆕 打卡邏輯：新增「間隔檢查」功能
 checkinBtn.addEventListener('click', async () => {
   if (!currentUser) return;
 
   const now = Date.now();
-  if (now - lastCheckinTime < 30000) { // 30 秒內不得再次打卡
-    alert('請勿連續重複打卡，請稍後再試。');
+  const interval = 30000; // 30秒內不得重複打卡
+
+  if (now - lastCheckinTimestamp < interval) {
+    alert('請勿重複打卡，請稍後再試');
     return;
   }
 
@@ -66,32 +67,31 @@ checkinBtn.addEventListener('click', async () => {
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    lastCheckinTime = now;
-    alert('打卡成功！');
-
-    // 更新畫面上的最近紀錄
-    loadRecentRecords();
+    lastCheckinTimestamp = now; // 📝 更新最後打卡時間
+    alert('打卡成功');
+    loadRecords();
   } catch (error) {
     console.error('打卡失敗', error);
+    alert('打卡失敗，請稍後再試');
   }
 });
 
-// 載入最近4筆打卡紀錄
-async function loadRecentRecords() {
+// 讀取打卡紀錄（沿用原本功能）
+async function loadRecords() {
   if (!currentUser) return;
 
   const snapshot = await db.collection('checkins')
     .where('uid', '==', currentUser.uid)
     .orderBy('timestamp', 'desc')
-    .limit(4)
+    .limit(10)
     .get();
 
-  recordsList.innerHTML = '';
+  recordList.innerHTML = '';
   snapshot.forEach(doc => {
     const data = doc.data();
     const li = document.createElement('li');
-    const ts = data.timestamp?.toDate().toLocaleString('zh-TW') || '尚未同步時間';
-    li.textContent = `${ts} - ${data.name}`;
-    recordsList.appendChild(li);
+    const time = data.timestamp ? data.timestamp.toDate().toLocaleString('zh-TW') : '尚未同步時間';
+    li.textContent = `${time} - ${data.name}`;
+    recordList.appendChild(li);
   });
 }
