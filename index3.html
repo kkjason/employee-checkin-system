@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>員工打卡系統 - 強化版</title>
+  <title>員工打卡系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/0.7.28/ua-parser.min.js"></script>
   <style>
@@ -42,9 +42,14 @@
       background-color: #f3f4f6;
       cursor: not-allowed;
     }
-    #countdown {
-      font-weight: bold;
-      color: #ef4444;
+
+    /* 新增：成功彈窗內確認按鈕樣式 */
+    #success-confirm {
+      background-color: #10b981; /* 綠色 */
+    }
+    #success-confirm:disabled {
+      background-color: #86efac;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -56,12 +61,19 @@
     <!-- 打卡頁面容器 -->
     <div id="checkin-container" class="hidden"></div>
 
-    <!-- 提示對話框 -->
+    <!-- 錯誤 / 訊息 提示對話框（原有）-->
     <div id="alert-modal" class="modal">
       <div class="modal-content">
         <p id="alert-message"></p>
-        <p id="countdown-container" class="hidden">自動關閉倒數：<span id="countdown">10</span> 秒</p>
-        <button id="alert-close" class="hidden">確定</button>
+        <button id="alert-close">確定</button>
+      </div>
+    </div>
+
+    <!-- 新增：成功彈窗（含倒數確認按鈕）-->
+    <div id="success-modal" class="modal">
+      <div class="modal-content">
+        <p id="success-message">打卡成功！</p>
+        <button id="success-confirm" disabled>確認（10）</button>
       </div>
     </div>
   </div>
@@ -93,69 +105,43 @@
     const alertModal = document.getElementById('alert-modal');
     const alertMessage = document.getElementById('alert-message');
     const alertClose = document.getElementById('alert-close');
-    const countdownContainer = document.getElementById('countdown-container');
-    const countdown = document.getElementById('countdown');
 
-    // 全域鎖定狀態
-    let isLocked = false;
+    // 成功 modal
+    const successModal = document.getElementById('success-modal');
+    const successMessage = document.getElementById('success-message');
+    const successConfirm = document.getElementById('success-confirm');
 
-    // 鎖定所有按鈕
-    function lockButtons() {
-      isLocked = true;
-      const buttons = document.querySelectorAll('#checkin-container button');
-      buttons.forEach(btn => btn.disabled = true);
-    }
-
-    // 解鎖所有按鈕
-    function unlockButtons() {
-      isLocked = false;
-      const buttons = document.querySelectorAll('#checkin-container button');
-      buttons.forEach(btn => btn.disabled = false);
-    }
-
-    // 顯示多語言提示（含倒數計時）
-    function showAlert(messages, isSuccess = false) {
+    // 顯示多語言提示（原有）
+    function showAlert(messages) {
       alertMessage.innerHTML = `
         <p>${messages.zh}</p>
         <p>${messages.vi}</p>
         <p>${messages.en}</p>
       `;
       alertModal.style.display = 'flex';
-
-      if (isSuccess) {
-        countdownContainer.classList.remove('hidden');
-        alertClose.classList.remove('hidden');
-        let timeLeft = 10;
-        countdown.textContent = timeLeft;
-
-        const timer = setInterval(() => {
-          timeLeft--;
-          countdown.textContent = timeLeft;
-          if (timeLeft <= 0) {
-            clearInterval(timer);
-            closeModal();
-          }
-        }, 1000);
-
-        alertClose.onclick = () => {
-          clearInterval(timer);
-          closeModal();
-        };
-      } else {
-        countdownContainer.classList.add('hidden');
-        alertClose.classList.remove('hidden');
-        alertClose.onclick = () => {
-          alertModal.style.display = 'none';
-        };
-      }
-
-      function closeModal() {
-        alertModal.style.display = 'none';
-        if (isSuccess) unlockButtons();
-      }
     }
 
-    // 獲取用戶 IP
+    // 關閉提示（原有） - 小修改：關閉時恢復按鈕
+    alertClose.addEventListener('click', () => {
+      alertModal.style.display = 'none';
+      enableButtons(); // 確保按鈕在錯誤提示關閉後會恢復
+    });
+
+    // 新增：按鈕 enable/disable helper（防止重複按）
+    function disableButtons() {
+      const b1 = document.getElementById('checkin-btn');
+      const b2 = document.getElementById('checkout-btn');
+      if (b1) b1.disabled = true;
+      if (b2) b2.disabled = true;
+    }
+    function enableButtons() {
+      const b1 = document.getElementById('checkin-btn');
+      const b2 = document.getElementById('checkout-btn');
+      if (b1) b1.disabled = false;
+      if (b2) b2.disabled = false;
+    }
+
+    // 獲取用戶 IP（原有）
     async function getUserIP() {
       try {
         const response = await fetch('https://api.ipify.org?format=json');
@@ -173,7 +159,7 @@
       }
     }
 
-    // 檢查 IP 是否在白名單（支援子網範圍）
+    // 檢查 IP 是否在白名單（支援子網範圍）（原有）
     async function isIPWhitelisted(ip) {
       if (!ip) return false;
       try {
@@ -207,7 +193,7 @@
       }
     }
 
-    // 檢查 IP 是否在子網範圍內
+    // 檢查 IP 是否在子網範圍內（原有）
     function isInSubnet(ip, subnet, prefix) {
       const ipToInt = ipToInteger(ip);
       const subnetToInt = ipToInteger(subnet);
@@ -215,12 +201,12 @@
       return (ipToInt & mask) === (subnetToInt & mask);
     }
 
-    // 將 IP 轉為整數
+    // 將 IP 轉為整數（原有）
     function ipToInteger(ip) {
       return ip.split('.').reduce((int, oct) => (int << 8) + parseInt(oct, 10), 0) >>> 0;
     }
 
-    // 渲染打卡表單
+    // 渲染打卡表單（原有，保持不變，僅在內部插入按鈕 disable/enable 邏輯）
     async function renderCheckinForm(lang = 'zh') {
       const t = getTranslations(lang);
       // 獲取當前用戶姓名
@@ -257,26 +243,58 @@
         </div>
       `;
 
-      // 語言切換事件
+      // 語言切換事件（原有）
       document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          if (isLocked) return; // 鎖定時禁止語言切換
           const newLang = btn.dataset.lang;
           localStorage.setItem('language', newLang);
           renderCheckinForm(newLang);
         });
       });
 
-      // 綁定按鈕事件
+      // 綁定按鈕事件（原有範圍內加入暫時 disable/enable 控制）
       const nameInput = document.getElementById('name-input');
       const locationInput = document.getElementById('location-input');
       const checkinBtn = document.getElementById('checkin-btn');
       const checkoutBtn = document.getElementById('checkout-btn');
       const logoutBtn = document.getElementById('logout-btn');
 
+      // 新增防止連續打卡功能 - 但保留原邏輯不改動
+      const checkLastCheckin = async () => {
+        const q = query(collection(db, 'checkins'));
+        const snapshot = await getDocs(q);
+        let lastTimestamp = null;
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.userId === auth.currentUser.uid) {
+            if (!lastTimestamp || new Date(data.timestamp) > new Date(lastTimestamp)) {
+              lastTimestamp = data.timestamp;
+            }
+          }
+        });
+        return lastTimestamp;
+      };
+
+      // ---- 改動起點：checkinBtn 事件加入按鈕暫時失效與成功 modal 倒數 ----
       checkinBtn.addEventListener('click', async () => {
-        if (isLocked) return; // 鎖定時禁止操作
-        lockButtons(); // 鎖定按鈕
+        // 先禁用按鈕以防止連擊
+        disableButtons();
+
+        const lastCheckin = await checkLastCheckin();
+        if (lastCheckin) {
+          const now = new Date();
+          const last = new Date(lastCheckin);
+          const diffMinutes = (now - last) / (1000 * 60);
+          if (diffMinutes < 5) {
+            // 顯示錯誤訊息，並恢復按鈕
+            showAlert({
+              zh: `距離上一次打卡不到 5 分鐘，請稍後再打卡`,
+              vi: `Chưa đến 5 phút kể từ lần chấm công trước, vui lòng thử lại sau`,
+              en: `It has been less than 5 minutes since your last check-in, please try later`
+            });
+            return; // alertClose 的事件會 re-enable 按鈕
+          }
+        }
 
         const location = locationInput.value;
         const deviceFingerprint = await generateDeviceFingerprint(); // 獲取設備信息
@@ -289,7 +307,6 @@
             vi: getTranslations('vi').emptyLocation,
             en: getTranslations('en').emptyLocation
           });
-          unlockButtons();
           return;
         }
 
@@ -299,7 +316,6 @@
             vi: getTranslations('vi').nameNotFound,
             en: getTranslations('en').nameNotFound
           });
-          unlockButtons();
           return;
         }
 
@@ -309,7 +325,6 @@
             vi: getTranslations('vi').ipError,
             en: getTranslations('en').ipError
           });
-          unlockButtons();
           return;
         }
 
@@ -320,7 +335,6 @@
             vi: getTranslations('vi').wifiError,
             en: getTranslations('en').wifiError
           });
-          unlockButtons();
           return;
         }
 
@@ -330,15 +344,18 @@
             location,
             type: 'checkin',
             timestamp: new Date().toISOString(),
-            device: deviceFingerprint,
+            device: deviceFingerprint, // 使用設備信息
             userId: auth.currentUser.uid,
             ip: userIP
           });
-          showAlert({
+
+          // 顯示成功彈窗（含倒數確認）
+          showSuccessModal({
             zh: t.checkinSuccess,
             vi: getTranslations('vi').checkinSuccess,
             en: getTranslations('en').checkinSuccess
-          }, true); // 成功提示，啟用倒數
+          });
+
         } catch (error) {
           console.error('打卡失敗:', error);
           showAlert({
@@ -346,13 +363,15 @@
             vi: `${getTranslations('vi').checkinFailed}: ${error.message}`,
             en: `${getTranslations('en').checkinFailed}: ${error.message}`
           });
-          unlockButtons();
+          return;
         }
       });
+      // ---- 改動終點 ----
 
+      // ---- 改動起點：checkoutBtn 事件加入按鈕暫時失效與成功 modal 倒數 ----
       checkoutBtn.addEventListener('click', async () => {
-        if (isLocked) return; // 鎖定時禁止操作
-        lockButtons(); // 鎖定按鈕
+        // 先禁用按鈕以防止連擊
+        disableButtons();
 
         const location = locationInput.value;
         const deviceFingerprint = await generateDeviceFingerprint(); // 獲取設備信息
@@ -365,7 +384,6 @@
             vi: getTranslations('vi').emptyLocation,
             en: getTranslations('en').emptyLocation
           });
-          unlockButtons();
           return;
         }
 
@@ -375,7 +393,6 @@
             vi: getTranslations('vi').nameNotFound,
             en: getTranslations('en').nameNotFound
           });
-          unlockButtons();
           return;
         }
 
@@ -385,7 +402,6 @@
             vi: getTranslations('vi').ipError,
             en: getTranslations('en').ipError
           });
-          unlockButtons();
           return;
         }
 
@@ -396,7 +412,6 @@
             vi: getTranslations('vi').wifiError,
             en: getTranslations('en').wifiError
           });
-          unlockButtons();
           return;
         }
 
@@ -406,15 +421,18 @@
             location,
             type: 'checkout',
             timestamp: new Date().toISOString(),
-            device: deviceFingerprint,
+            device: deviceFingerprint, // 使用設備信息
             userId: auth.currentUser.uid,
             ip: userIP
           });
-          showAlert({
+
+          // 顯示成功彈窗（含倒數確認）
+          showSuccessModal({
             zh: t.checkoutSuccess,
             vi: getTranslations('vi').checkoutSuccess,
             en: getTranslations('en').checkoutSuccess
-          }, true); // 成功提示，啟用倒數
+          });
+
         } catch (error) {
           console.error('打卡失敗:', error);
           showAlert({
@@ -422,12 +440,12 @@
             vi: `${getTranslations('vi').checkinFailed}: ${error.message}`,
             en: `${getTranslations('en').checkinFailed}: ${error.message}`
           });
-          unlockButtons();
+          return;
         }
       });
+      // ---- 改動終點 ----
 
       logoutBtn.addEventListener('click', () => {
-        if (isLocked) return; // 鎖定時禁止登出
         signOut(auth).then(() => {
           console.log('登出成功');
           window.location.reload();
@@ -439,6 +457,44 @@
           });
         });
       });
+    }
+
+    // 新增：顯示成功彈窗並啟動倒數確認（10 秒）
+    function showSuccessModal(messages) {
+      // 顯示多語系訊息（取 zh 為範例）
+      successMessage.innerHTML = `
+        <p>${messages.zh}</p>
+        <p style="font-size:0.9rem;color:#666;margin-top:6px">${messages.en}</p>
+      `;
+      successModal.style.display = 'flex';
+
+      // 初始化倒數
+      let countdown = 10;
+      successConfirm.disabled = true;
+      successConfirm.textContent = `確認（${countdown}）`;
+
+      const timer = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          successConfirm.textContent = `確認（${countdown}）`;
+        } else {
+          clearInterval(timer);
+          successConfirm.disabled = false;
+          successConfirm.textContent = '確認';
+        }
+      }, 1000);
+
+      // 點擊確認：關閉 modal 並恢復按鈕
+      const onConfirm = () => {
+        successModal.style.display = 'none';
+        successConfirm.disabled = true;
+        successConfirm.textContent = '確認（10）';
+        successConfirm.removeEventListener('click', onConfirm);
+        enableButtons();
+      };
+
+      // 如果使用者按下確認（在倒數完畢後）
+      successConfirm.addEventListener('click', onConfirm);
     }
 
     // 等待 DOM 載入完成
